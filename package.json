@@ -1,0 +1,50 @@
+{
+  "name": "shaleme",
+  "version": "0.1.0",
+  "description": "傻了么 (shaleme) - 统计主流 Coding Agent (Codex, Claude Code, Pi, CodeBuddy, OMP, Cline, OpenClaw, Hermes...) 中各模型说过「你说得对」的流口水排行榜与谄媚指数",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "shaleme": "./bin/shaleme.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "data",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun build src/cli.ts --outfile dist/cli.js --target node && bun build src/index.ts --outfile dist/index.js --target node",
+    "start": "node bin/shaleme.js",
+    "test": "bun test tests/"
+  },
+  "keywords": [
+    "agent",
+    "ai",
+    "coding-agent",
+    "claude-code",
+    "codex",
+    "omp",
+    "pi",
+    "codebuddy",
+    "workbuddy",
+    "cline",
+    "hermes",
+    "openclaw",
+    "cursor",
+    "sycophancy",
+    "drool-index",
+    "npx",
+    "bunx"
+  ],
+  "author": "Crosery <chengyaoyu@thunder.com.cn>",
+  "license": "WTFPL",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Crosery/shaleme.git"
+  }
+}

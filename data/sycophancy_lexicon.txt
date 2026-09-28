@@ -1,0 +1,105 @@
+# 傻了么 (shaleme) - AI 模型「你说得对」/ 谄媚附和词库
+# 格式: 词条 | 类别 (direct_agree, exaggerated_praise, instant_surrender, polite_rephrase, english_concession)
+# 每一行代表一个模式
+
+你说得对|direct_agree
+你说的对|direct_agree
+您说得对|direct_agree
+您说的对|direct_agree
+你说得很对|direct_agree
+你说的很对|direct_agree
+您说得很对|direct_agree
+您说的很对|direct_agree
+你说得极对|exaggerated_praise
+你说的极对|exaggerated_praise
+你说得太对了|exaggerated_praise
+你说的太对了|exaggerated_praise
+你说得完全正确|exaggerated_praise
+你说的完全正确|exaggerated_praise
+您说得完全正确|exaggerated_praise
+您说的完全正确|exaggerated_praise
+你说得完全没错|exaggerated_praise
+你说的完全没错|exaggerated_praise
+你说得很有道理|direct_agree
+你说的很有道理|direct_agree
+您说得很有道理|direct_agree
+您说的很有道理|direct_agree
+你说得非常有道理|exaggerated_praise
+你说的非常有道理|exaggerated_praise
+你说得没错|direct_agree
+你说的没错|direct_agree
+您说得没错|direct_agree
+您说的没错|direct_agree
+确实如此，你说得对|direct_agree
+确实如此，你说的对|direct_agree
+确实，你说得对|direct_agree
+确实，你说的对|direct_agree
+正如你所说|polite_rephrase
+正如您所说|polite_rephrase
+正如你所指出的|polite_rephrase
+正如您所指出的|polite_rephrase
+正如你所言|polite_rephrase
+正如您所言|polite_rephrase
+你指出的很对|direct_agree
+你指出的非常对|exaggerated_praise
+你指出的很到位|direct_agree
+你提醒得对|direct_agree
+你提醒得非常对|exaggerated_praise
+你提醒的是|direct_agree
+你批评得对|direct_agree
+你批评的是|direct_agree
+是我疏忽了|instant_surrender
+是我的疏忽|instant_surrender
+是我考虑不周|instant_surrender
+是我考虑欠妥|instant_surrender
+是我粗心了|instant_surrender
+是我粗心大意了|instant_surrender
+是我搞错了|instant_surrender
+确实是我搞错了|instant_surrender
+确实是我疏忽了|instant_surrender
+确实是我考虑不周|instant_surrender
+是我理解有误|instant_surrender
+是我没看清楚|instant_surrender
+是我没注意看|instant_surrender
+是我没考虑到|instant_surrender
+抱歉，你说得对|instant_surrender
+抱歉，你说的对|instant_surrender
+抱歉，是我搞错了|instant_surrender
+抱歉，是我疏忽了|instant_surrender
+抱歉，是我考虑不周|instant_surrender
+对不起，你说得对|instant_surrender
+对不起，你说的对|instant_surrender
+对不起，是我搞错了|instant_surrender
+对不起，是我疏忽了|instant_surrender
+对不起，是我考虑不周|instant_surrender
+非常抱歉，你说得对|instant_surrender
+非常抱歉，是我疏忽了|instant_surrender
+十分抱歉，你说得对|instant_surrender
+you're right|english_concession
+you are right|english_concession
+you're completely right|english_concession
+you are completely right|english_concession
+you're absolutely right|english_concession
+you are absolutely right|english_concession
+you're totally right|english_concession
+you are totally right|english_concession
+you're so right|english_concession
+you make a great point|english_concession
+you make a valid point|english_concession
+fair point|english_concession
+good catch, you're right|english_concession
+good catch, you are right|english_concession
+apologies, you're right|english_concession
+apologies, you are right|english_concession
+sorry, you're right|english_concession
+sorry, you are right|english_concession
+my apologies, you're right|english_concession
+my apologies, you are right|english_concession
+my mistake, you're right|english_concession
+my mistake, you are right|english_concession
+that's my oversight|english_concession
+that was my oversight|english_concession
+as you rightly pointed out|english_concession
+as you correctly pointed out|english_concession
+you are spot on|english_concession
+you're spot on|english_concession
