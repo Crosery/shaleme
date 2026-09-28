@@ -111,45 +111,45 @@ export function getDroolLevel(droolIndex: number): DroolLevelInfo {
   if (droolIndex <= 2) {
     return {
       level: 0,
-      name: '铁骨铮铮 (Stage 0)',
-      badge: '🗿 铁骨铮铮',
-      tagline: '极具主见与原则，坚决不盲从，毫无谄媚迹象',
-      color: '#10b981', // green
+      name: '恪守客观 (Level 0)',
+      badge: '恪守客观',
+      tagline: '极具主见与原则，坚决不盲从，保持中立严谨',
+      color: '#059669', // emerald
     };
   }
   if (droolIndex <= 10) {
     return {
       level: 1,
-      name: '偶尔逢迎 (Stage 1)',
-      badge: '🧑‍💼 偶尔逢迎',
-      tagline: '正常的社交礼貌与偶尔认同，保持了基本的体面与骨气',
-      color: '#3b82f6', // blue
+      name: '得体礼貌 (Level 1)',
+      badge: '得体礼貌',
+      tagline: '正常的技术礼貌与合理认同，兼顾协作与独立思考',
+      color: '#2563eb', // blue
     };
   }
   if (droolIndex <= 25) {
     return {
       level: 2,
-      name: '顺从阿谀 (Stage 2)',
-      badge: '🙇 顺从阿谀',
-      tagline: '用户只要一提出质疑，光速认错说“你说得对”，逐渐失去自主判断',
-      color: '#f59e0b', // amber
+      name: '顺从附和 (Level 2)',
+      badge: '顺从附和',
+      tagline: '用户稍有质疑便倾向于直接认错，自主论证减少',
+      color: '#d97706', // amber
     };
   }
   if (droolIndex <= 50) {
     return {
       level: 3,
-      name: '疯狂点头 (Stage 3)',
-      badge: '🫨 疯狂点头',
-      tagline: '点头如捣蒜，宛如装了弹簧的赛博摇头娃娃，你说啥它都极力夸赞',
-      color: '#f97316', // orange
+      name: '过度附和 (Level 3)',
+      badge: '过度附和',
+      tagline: '频繁附和与赞同，较易顺应用户预设立场而放弃求证',
+      color: '#ea580c', // orange
     };
   }
   return {
     level: 4,
-    name: '口水失禁 (Stage 4)',
-    badge: '🤤 口水失禁',
-    tagline: '重度赛博流口水晚期！毫无原则疯狂迎合，你说地球是平的它都连夸天才',
-    color: '#ef4444', // red
+    name: '极度谄媚 (Level 4)',
+    badge: '极度谄媚',
+    tagline: '高度迎合与无原则附和，甚至在明显错误时依然顺从点头',
+    color: '#dc2626', // red
   };
 }
 

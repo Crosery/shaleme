@@ -70,9 +70,9 @@ ${c.bold('支持的 Agent 平台:')}
   if (!isJson) {
     for (const h of available) {
       const status = h.available
-        ? c.green('✓ 已发现会话数据')
-        : c.gray('○ 未检测到数据');
-      console.log(`  ${h.icon} ${c.bold(h.name.padEnd(24))} ${status}`);
+        ? c.green('[已发现会话]')
+        : c.gray('[未检测到数据]');
+      console.log(`  ${c.cyan(h.id.toUpperCase().padEnd(10))} ${c.bold(h.name.padEnd(26))} ${status}`);
     }
     console.log('');
   }
@@ -81,14 +81,14 @@ ${c.bold('支持的 Agent 平台:')}
     if (isJson) {
       console.log(JSON.stringify({ error: 'No active agent harnesses found on this machine' }));
     } else {
-      console.log(c.yellow('⚠️ 未在当前机器的主目录中检测到任何支持的 Agent 会话数据。'));
+      console.log(c.yellow('! 未在当前机器的主目录中检测到任何支持的 Agent 会话数据。'));
       console.log(c.dim('支持检测 ~/.claude, ~/.codex, ~/.omp, ~/.pi, ~/.workbuddy, Cline, Hermes, Cursor 等。\n'));
     }
     process.exit(0);
   }
 
   if (!isJson) {
-    console.log(c.cyan('🚀 开始深度扫描 AI 会话并统计「你说得对」流口水指数...\n'));
+    console.log(c.cyan('>>> 开始深度扫描 AI 会话并统计「你说得对」行为基准...\n'));
   }
 
   const detector = new SycophancyDetector();
@@ -98,13 +98,13 @@ ${c.bold('支持的 Agent 平台:')}
       harnesses: selectedHarnesses,
       onHarnessStart: (h, name) => {
         if (!isJson) {
-          process.stdout.write(`  ⏳ 正在分析 ${name}... `);
+          process.stdout.write(`  ... 正在分析 ${name}... `);
         }
       },
       onHarnessEnd: (h, name, msgCount, matchCount) => {
         if (!isJson) {
           const matchStr = matchCount > 0 ? c.brightYellow(`${matchCount} 次「你说得对」`) : c.dim('0 次');
-          process.stdout.write(`\r  ${c.green('✓')} ${name}: 分析了 ${c.bold(String(msgCount))} 条助手回复，发现 ${matchStr}\n`);
+          process.stdout.write(`\r  ${c.green('[OK]')} ${name}: 分析了 ${c.bold(String(msgCount))} 条回复，发现 ${matchStr}\n`);
         }
       },
     },
@@ -116,32 +116,32 @@ ${c.bold('支持的 Agent 平台:')}
     process.exit(0);
   }
 
-  console.log('\n' + c.bold('──────────────── 📊 傻了么 (shaleme) 统计战报 ────────────────'));
-  console.log(`  综合流口水诊断:  ${summary.overallDroolLevel.badge} (${c.bold(summary.overallDroolLevel.name)})`);
+  console.log('\n' + c.bold('──────────────── 统计战报 (SHALEME BENCHMARK) ────────────────'));
+  console.log(`  综合行为倾向:    ${summary.overallDroolLevel.badge} (${c.bold(summary.overallDroolLevel.name)})`);
   console.log(`  诊断评价:        ${c.dim(summary.overallDroolLevel.tagline)}`);
-  console.log(`  抓获认怂总数:    ${c.brightYellow(c.bold(String(summary.totalDroolCount)))} 次`);
+  console.log(`  抓获认同总数:    ${c.brightYellow(c.bold(String(summary.totalDroolCount)))} 次`);
   console.log(`  分析助手消息:    ${summary.totalAssistantMessages} 条`);
-  console.log(`  流口水指数 (MDI): ${c.cyan(String(summary.overallDroolIndex))} ‰ (每千次回答说「你说得对」的次数)`);
+  console.log(`  流口水指数 (MDI): ${c.cyan(String(summary.overallDroolIndex))} ‰ (每千次回答说「你说得对」的频次)`);
   console.log(c.bold('───────────────────────────────────────────────────────────────\n'));
 
   // Print Top 5 Models
-  console.log(c.bold('🏆 赛博点头狂魔榜 Top 5:'));
+  console.log(c.bold('TOP 5 附和榜首模型:'));
   const topModels = summary.modelRankings.slice(0, 5);
   if (topModels.length === 0) {
     console.log(c.gray('  (未发现模型命中「你说得对」或暂无对话消息)'));
   } else {
     for (let i = 0; i < topModels.length; i++) {
       const m = topModels[i];
-      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : ` #${i + 1}`;
+      const rankTag = `[#0${i + 1}]`;
       console.log(
-        `  ${medal} ${c.bold(m.model.padEnd(28))} ${c.brightYellow(String(m.droolCount).padStart(3))} 次  ` +
-          `[指数: ${String(m.droolIndex).padStart(5)} ‰]  ${m.droolLevel.badge}`,
+        `  ${c.cyan(rankTag)} ${c.bold(m.model.padEnd(28))} ${c.brightYellow(String(m.droolCount).padStart(3))} 次  ` +
+          `[MDI: ${String(m.droolIndex).padStart(5)} ‰]  [${m.droolLevel.badge}]`,
       );
     }
   }
 
   // Print Top Phrases
-  console.log('\n' + c.bold('💬 经典流口水口头禅 Top 5:'));
+  console.log('\n' + c.bold('特征附和口头禅 Top 5:'));
   const topPhrases = summary.phraseCloud.slice(0, 5);
   if (topPhrases.length === 0) {
     console.log(c.gray('  (无)'));
@@ -153,7 +153,7 @@ ${c.bold('支持的 Agent 平台:')}
 
   // Write HTML report
   const reportPath = writeReportToFile(summary, customOut);
-  console.log('\n' + c.green(`📄 Standalone HTML 报告已生成至:`));
+  console.log('\n' + c.green(`Standalone HTML 报告已生成至:`));
   console.log(`   ${c.bold(reportPath)}\n`);
 
   if (!noOpen) {

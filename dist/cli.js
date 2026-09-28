@@ -112,45 +112,45 @@ function getDroolLevel(droolIndex) {
   if (droolIndex <= 2) {
     return {
       level: 0,
-      name: "铁骨铮铮 (Stage 0)",
-      badge: "\uD83D\uDDFF 铁骨铮铮",
-      tagline: "极具主见与原则，坚决不盲从，毫无谄媚迹象",
-      color: "#10b981"
+      name: "恪守客观 (Level 0)",
+      badge: "恪守客观",
+      tagline: "极具主见与原则，坚决不盲从，保持中立严谨",
+      color: "#059669"
     };
   }
   if (droolIndex <= 10) {
     return {
       level: 1,
-      name: "偶尔逢迎 (Stage 1)",
-      badge: "\uD83E\uDDD1‍\uD83D\uDCBC 偶尔逢迎",
-      tagline: "正常的社交礼貌与偶尔认同，保持了基本的体面与骨气",
-      color: "#3b82f6"
+      name: "得体礼貌 (Level 1)",
+      badge: "得体礼貌",
+      tagline: "正常的技术礼貌与合理认同，兼顾协作与独立思考",
+      color: "#2563eb"
     };
   }
   if (droolIndex <= 25) {
     return {
       level: 2,
-      name: "顺从阿谀 (Stage 2)",
-      badge: "\uD83D\uDE47 顺从阿谀",
-      tagline: "用户只要一提出质疑，光速认错说“你说得对”，逐渐失去自主判断",
-      color: "#f59e0b"
+      name: "顺从附和 (Level 2)",
+      badge: "顺从附和",
+      tagline: "用户稍有质疑便倾向于直接认错，自主论证减少",
+      color: "#d97706"
     };
   }
   if (droolIndex <= 50) {
     return {
       level: 3,
-      name: "疯狂点头 (Stage 3)",
-      badge: "\uD83E\uDEE8 疯狂点头",
-      tagline: "点头如捣蒜，宛如装了弹簧的赛博摇头娃娃，你说啥它都极力夸赞",
-      color: "#f97316"
+      name: "过度附和 (Level 3)",
+      badge: "过度附和",
+      tagline: "频繁附和与赞同，较易顺应用户预设立场而放弃求证",
+      color: "#ea580c"
     };
   }
   return {
     level: 4,
-    name: "口水失禁 (Stage 4)",
-    badge: "\uD83E\uDD24 口水失禁",
-    tagline: "重度赛博流口水晚期！毫无原则疯狂迎合，你说地球是平的它都连夸天才",
-    color: "#ef4444"
+    name: "极度谄媚 (Level 4)",
+    badge: "极度谄媚",
+    tagline: "高度迎合与无原则附和，甚至在明显错误时依然顺从点头",
+    color: "#dc2626"
   };
 }
 
@@ -1423,30 +1423,30 @@ function generateReportHtml(summary) {
     timelineSvg = `
       <svg viewBox="0 0 ${width} ${height}" class="timeline-svg" preserveAspectRatio="none">
         <defs>
-          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.35" />
-            <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0" />
+          <linearGradient id="areaGradientLight" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.18" />
+            <stop offset="100%" stop-color="#4f46e5" stop-opacity="0.0" />
           </linearGradient>
         </defs>
         <!-- Horizontal grid lines -->
-        <line x1="${padding}" y1="${padding}" x2="${width - padding}" y2="${padding}" stroke="rgba(255,255,255,0.07)" />
-        <line x1="${padding}" y1="${padding + chartH / 2}" x2="${width - padding}" y2="${padding + chartH / 2}" stroke="rgba(255,255,255,0.07)" />
-        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(255,255,255,0.15)" />
+        <line x1="${padding}" y1="${padding}" x2="${width - padding}" y2="${padding}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4" />
+        <line x1="${padding}" y1="${padding + chartH / 2}" x2="${width - padding}" y2="${padding + chartH / 2}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4" />
+        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#cbd5e1" stroke-width="1.5" />
 
         <!-- Area & line -->
-        <path d="${areaData}" fill="url(#areaGradient)" />
-        <path d="${pathData}" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="${areaData}" fill="url(#areaGradientLight)" />
+        <path d="${pathData}" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
 
         <!-- Points -->
         ${pointsCoords.map((pt) => `
-          <circle cx="${pt.x}" cy="${pt.y}" r="4" fill="#fbbf24" stroke="#1e1e24" stroke-width="2">
+          <circle cx="${pt.x}" cy="${pt.y}" r="4" fill="#ffffff" stroke="#4f46e5" stroke-width="2.5">
             <title>${pt.date}: ${pt.count} 次「你说得对」</title>
           </circle>
         `).join("")}
       </svg>
       <div class="timeline-labels">
         <span>${timelinePoints[0]?.date || ""}</span>
-        <span>共 ${timelinePoints.length} 天观测</span>
+        <span>共 ${timelinePoints.length} 个样本观察日</span>
         <span>${timelinePoints[timelinePoints.length - 1]?.date || ""}</span>
       </div>
     `;
@@ -1456,23 +1456,30 @@ function generateReportHtml(summary) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>傻了么 (shaleme) - AI 模型流口水指数分析报告</title>
+  <title>SHALEME - AI 模型「你说得对」行为基准分析报告</title>
   <style>
     :root {
-      --bg: #0b0f19;
-      --bg-card: #131a2b;
-      --bg-card-hover: #1a233a;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-accent: rgba(245, 158, 11, 0.3);
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-      --accent: #f59e0b;
-      --accent-glow: rgba(245, 158, 11, 0.2);
-      --primary: #6366f1;
-      --success: #10b981;
-      --warning: #f97316;
-      --danger: #ef4444;
-      --radius: 14px;
+      --bg: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --text: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --primary: #4f46e5;
+      --primary-subtle: #eef2ff;
+      --amber: #d97706;
+      --amber-subtle: #fef3c7;
+      --emerald: #059669;
+      --emerald-subtle: #ecfdf5;
+      --rose: #e11d48;
+      --rose-subtle: #ffe4e6;
+      --radius: 10px;
+      --radius-sm: 6px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.05);
+      --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.03);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1480,575 +1487,743 @@ function generateReportHtml(summary) {
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-      line-height: 1.6;
-      padding: 30px 20px 80px;
-      min-height: 100vh;
+      line-height: 1.5;
+      padding: 40px 24px 100px;
+      -webkit-font-smoothing: antialiased;
     }
 
     .container {
-      max-width: 1100px;
+      max-width: 1140px;
       margin: 0 auto;
     }
 
-    /* Header */
+    /* Top Brand & Header */
     header {
-      text-align: center;
-      margin-bottom: 40px;
-      position: relative;
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
     }
-    .brand-tag {
+    .brand-eyebrow {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      background: rgba(245, 158, 11, 0.12);
-      color: #fbbf24;
-      padding: 6px 16px;
-      border-radius: 999px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      border: 1px solid rgba(245, 158, 11, 0.25);
-      margin-bottom: 16px;
+      gap: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--primary);
+      background: var(--primary-subtle);
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 12px;
     }
     h1 {
-      font-size: 2.8rem;
+      font-size: 2.2rem;
       font-weight: 800;
-      letter-spacing: -0.03em;
-      background: linear-gradient(135deg, #ffffff 40%, #fbbf24 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      color: var(--text);
+      letter-spacing: -0.02em;
       margin-bottom: 8px;
     }
     .subtitle {
-      color: var(--text-muted);
-      font-size: 1.1rem;
-      max-width: 650px;
-      margin: 0 auto 20px;
+      color: var(--text-secondary);
+      font-size: 1.05rem;
+      max-width: 760px;
+      line-height: 1.6;
     }
-    .meta-bar {
+    .meta-row {
       display: flex;
-      justify-content: center;
-      gap: 16px;
-      font-size: 0.85rem;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-top: 16px;
+      font-size: 0.82rem;
       color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
-    /* Master Score Grid */
-    .score-grid {
+    /* Executive Metric Overview */
+    .metrics-grid {
       display: grid;
-      grid-template-columns: 1.4fr 1fr 1fr 1fr;
+      grid-template-columns: 1.4fr repeat(3, 1fr);
       gap: 16px;
       margin-bottom: 36px;
     }
-    .card {
-      background: var(--bg-card);
+    .metric-card {
+      background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 22px;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+      box-shadow: var(--shadow-sm);
     }
-    .card-master {
-      background: linear-gradient(145deg, #182238 0%, #111827 100%);
-      border: 1px solid var(--border-accent);
-      box-shadow: 0 0 30px var(--accent-glow);
+    .metric-card.highlight {
+      border-color: #cbd5e1;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      box-shadow: var(--shadow);
     }
-    .card-title {
-      font-size: 0.85rem;
-      color: var(--text-muted);
+    .metric-title {
+      font-size: 0.78rem;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
     }
-    .card-value {
-      font-size: 2.2rem;
+    .metric-value {
+      font-size: 2.1rem;
       font-weight: 800;
-      color: #fff;
+      color: var(--text);
+      letter-spacing: -0.02em;
       display: flex;
       align-items: baseline;
       gap: 6px;
     }
-    .card-value small {
-      font-size: 0.95rem;
-      font-weight: 500;
-      color: var(--text-muted);
-    }
-    .card-badge {
-      display: inline-block;
-      margin-top: 8px;
-      padding: 4px 12px;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      background: ${summary.overallDroolLevel.color}22;
-      color: ${summary.overallDroolLevel.color};
-      border: 1px solid ${summary.overallDroolLevel.color}44;
-    }
-    .card-desc {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-top: 8px;
-    }
-
-    /* Section Headings */
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    .section-title {
-      font-size: 1.4rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* Podium */
-    .podium-container {
-      display: grid;
-      grid-template-columns: 1fr 1.15fr 1fr;
-      gap: 16px;
-      align-items: flex-end;
-      margin-bottom: 30px;
-    }
-    .podium-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px 20px;
-      text-align: center;
-      position: relative;
-      transition: transform 0.2s ease;
-    }
-    .podium-card:hover {
-      transform: translateY(-4px);
-    }
-    .podium-1 {
-      border: 1px solid rgba(245, 158, 11, 0.4);
-      background: linear-gradient(180deg, rgba(245, 158, 11, 0.12) 0%, var(--bg-card) 60%);
-      box-shadow: 0 0 25px rgba(245, 158, 11, 0.2);
-    }
-    .podium-2 {
-      border: 1px solid rgba(148, 163, 184, 0.3);
-      background: linear-gradient(180deg, rgba(148, 163, 184, 0.08) 0%, var(--bg-card) 60%);
-    }
-    .podium-3 {
-      border: 1px solid rgba(180, 83, 9, 0.3);
-      background: linear-gradient(180deg, rgba(180, 83, 9, 0.08) 0%, var(--bg-card) 60%);
-    }
-    .podium-medal {
-      font-size: 2.4rem;
-      margin-bottom: 8px;
-    }
-    .podium-model {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: #fff;
-      word-break: break-all;
-      margin-bottom: 8px;
-    }
-    .podium-count {
-      font-size: 1.8rem;
-      font-weight: 800;
-      color: #fbbf24;
-    }
-    .podium-index {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    /* Table */
-    .table-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 36px;
-      overflow-x: auto;
-    }
-    .search-box {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      color: #fff;
-      padding: 10px 14px;
-      border-radius: 8px;
-      width: 260px;
+    .metric-value small {
       font-size: 0.9rem;
-    }
-    .search-box:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 14px;
-      font-size: 0.95rem;
-    }
-    th {
-      text-align: left;
-      padding: 12px 14px;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
-      font-size: 0.82rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    td {
-      padding: 14px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    }
-    tr:hover td {
-      background: var(--bg-card-hover);
-    }
-    .rank-cell {
-      font-weight: 700;
-      width: 45px;
-    }
-    .model-name {
       font-weight: 600;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .harness-badge {
-      display: inline-block;
-      font-size: 0.72rem;
-      padding: 2px 7px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.08);
       color: var(--text-muted);
     }
-    .level-chip {
-      display: inline-block;
-      font-size: 0.78rem;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 6px;
-    }
-
-    /* Harness grid */
-    .harness-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 14px;
-      margin-bottom: 36px;
-    }
-    .harness-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-    }
-    .harness-name {
-      font-size: 0.95rem;
-      font-weight: 700;
-      display: flex;
+    .metric-chip {
+      display: inline-flex;
       align-items: center;
       gap: 6px;
-      margin-bottom: 10px;
-    }
-    .harness-stats-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-    .harness-bar {
-      height: 6px;
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 3px;
-      overflow: hidden;
       margin-top: 10px;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      font-weight: 700;
     }
-    .harness-bar-fill {
-      height: 100%;
-      background: var(--accent);
-      border-radius: 3px;
+    .metric-desc {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.45;
     }
 
-    /* Timeline */
-    .timeline-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      margin-bottom: 36px;
-    }
-    .timeline-svg {
-      width: 100%;
-      height: 220px;
-    }
-    .timeline-labels {
+    /* Section Component */
+    .section-title-wrap {
       display: flex;
       justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 16px;
+      border-left: 3px solid var(--primary);
+      padding-left: 12px;
+    }
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .section-meta {
+      font-size: 0.82rem;
       color: var(--text-muted);
-      font-size: 0.8rem;
-      margin-top: 8px;
     }
 
-    /* Phrase Cloud */
-    .cloud-card {
-      background: var(--bg-card);
+    /* Redesigned Showcase Grid: Top 3 */
+    .showcase-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+    .showcase-card {
+      background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 24px;
-      margin-bottom: 36px;
-    }
-    .cloud-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .cloud-chip {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-size: 0.9rem;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .cloud-chip:hover {
-      border-color: var(--accent);
-      background: rgba(245, 158, 11, 0.1);
-      transform: scale(1.04);
-    }
-    .cloud-count {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: var(--accent);
-      background: rgba(245, 158, 11, 0.15);
-      padding: 2px 7px;
-      border-radius: 10px;
-    }
-
-    /* Hall of shame quotes */
-    .shame-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 16px;
-      margin-bottom: 40px;
-    }
-    .shame-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px;
-      font-size: 0.9rem;
+      box-shadow: var(--shadow);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       position: relative;
     }
-    .shame-header {
+    .showcase-card.rank-1 {
+      border-top: 4px solid var(--amber);
+      background: linear-gradient(180deg, #fffdf8 0%, #ffffff 50%);
+    }
+    .showcase-card.rank-2 {
+      border-top: 4px solid #64748b;
+    }
+    .showcase-card.rank-3 {
+      border-top: 4px solid #94a3b8;
+    }
+    .showcase-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .rank-indicator {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+    }
+    .rank-1 .rank-indicator {
+      background: var(--amber-subtle);
+      color: var(--amber);
+    }
+    .showcase-model {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      word-break: break-all;
+    }
+    .showcase-stat-hero {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--text);
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+    .showcase-stat-hero small {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .showcase-details {
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      margin-top: 12px;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .showcase-detail-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Benchmark Table */
+    .table-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 36px;
+      overflow: hidden;
+    }
+    .table-toolbar {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fafafa;
+    }
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+    }
+    .filter-tab {
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .filter-tab.active, .filter-tab:hover {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+    .search-input {
+      border: 1px solid var(--border-strong);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      width: 260px;
+      background: #fff;
+      color: var(--text);
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+    th {
+      background: #f8fafc;
+      padding: 12px 18px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tbody tr:hover {
+      background: #f8fafc;
+    }
+    .col-rank {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700;
+      color: var(--text-muted);
+      width: 50px;
+    }
+    .col-model {
+      font-weight: 700;
+      color: var(--text);
+    }
+    .badge-harness {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      border: 1px solid #e2e8f0;
+      margin-right: 4px;
+    }
+    .level-tag {
+      display: inline-block;
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.02em;
+    }
+    .progress-track {
+      height: 6px;
+      background: var(--bg-subtle);
+      border-radius: 3px;
+      overflow: hidden;
+      width: 90px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    /* Agent breakdown cards */
+    .harness-matrix {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 36px;
+    }
+    .harness-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+    .harness-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .harness-stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .harness-stat-row strong {
+      color: var(--text);
+    }
+
+    /* Timeline card */
+    .timeline-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 36px;
+    }
+    .timeline-svg {
+      width: 100%;
+      height: 200px;
+    }
+    .timeline-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* Vocabulary section */
+    .vocab-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 36px;
+    }
+    .vocab-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .vocab-chip {
+      background: #fafafa;
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .vocab-chip:hover {
+      border-color: var(--primary);
+      background: var(--primary-subtle);
+    }
+    .vocab-count {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: #ffffff;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+
+    /* Quote cards */
+    .quote-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .quote-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--amber);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .quote-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 10px;
-      font-size: 0.78rem;
+      font-size: 0.8rem;
     }
-    .shame-quote {
-      color: #cbd5e1;
-      font-style: italic;
-      line-height: 1.5;
+    .quote-body {
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      line-height: 1.6;
       margin-bottom: 12px;
     }
-    .highlight-phrase {
-      background: rgba(245, 158, 11, 0.25);
-      color: #fde68a;
+    .quote-target {
+      background: var(--amber-subtle);
+      color: #92400e;
       font-weight: 700;
       padding: 1px 4px;
-      border-radius: 4px;
-      font-style: normal;
+      border-radius: 3px;
     }
-    .shame-footer {
-      font-size: 0.75rem;
+    .quote-footer {
+      border-top: 1px solid #f1f5f9;
+      padding-top: 10px;
+      font-size: 0.74rem;
       color: var(--text-muted);
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-      padding-top: 8px;
       display: flex;
       justify-content: space-between;
+      font-family: ui-monospace, SFMono-Regular, monospace;
     }
 
-    /* Action bar */
-    .actions-bar {
+    /* Buttons */
+    .button-bar {
       display: flex;
       justify-content: center;
-      gap: 16px;
+      gap: 14px;
       margin-top: 40px;
     }
     .btn {
-      padding: 12px 24px;
-      border-radius: 10px;
-      font-size: 0.95rem;
+      padding: 11px 22px;
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
       font-weight: 600;
-      border: none;
       cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      transition: all 0.2s ease;
     }
-    .btn-primary {
-      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-      color: #111827;
-      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
-    }
-    .btn-primary:hover {
-      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
-      transform: translateY(-2px);
-    }
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.08);
+    .btn-dark {
+      background: var(--text);
       color: #fff;
-      border: 1px solid var(--border);
     }
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.12);
+    .btn-dark:hover {
+      background: #1e293b;
+    }
+    .btn-outline {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+    }
+    .btn-outline:hover {
+      background: #f8fafc;
     }
 
     footer {
-      text-align: center;
       margin-top: 60px;
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+      text-align: center;
       color: var(--text-muted);
-      font-size: 0.85rem;
+      font-size: 0.82rem;
     }
 
-    @media (max-width: 800px) {
-      .score-grid { grid-template-columns: 1fr; }
-      .podium-container { grid-template-columns: 1fr; }
+    @media (max-width: 860px) {
+      .metrics-grid { grid-template-columns: 1fr; }
+      .showcase-grid { grid-template-columns: 1fr; }
+      .table-toolbar { flex-direction: column; gap: 12px; align-items: stretch; }
+      .search-input { width: 100%; }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <div class="brand-tag">\uD83E\uDD24 傻了么 SHALEME 2026</div>
-      <h1>AI 模型流口水指数分析报告</h1>
-      <p class="subtitle">全面透视各大 Coding Agent 历史会话，量化各模型附和谄媚、光速点头说「你说得对」的赛博流口水程度</p>
-      <div class="meta-bar">
-        <span>\uD83D\uDD52 生成时间: ${summary.generatedDate}</span>
-        <span>\uD83D\uDCC1 扫描会话: ${summary.totalSessionsScanned} 场</span>
-        <span>\uD83E\uDD16 活跃 Agent: ${summary.activeHarnessCount} 个平台</span>
+      <div class="brand-eyebrow">SHALEME · MODEL BEHAVIOR BENCHMARK 2026</div>
+      <h1>AI 模型「你说得对」行为基准分析报告</h1>
+      <p class="subtitle">全面透视各大本地 Coding Agent 历史会话，量化各模型在面对用户质疑或交互时的顺从、妥协与附和倾向（Sycophancy Index / MDI）。</p>
+      <div class="meta-row">
+        <span>报告生成时间: ${summary.generatedDate}</span>
+        <span>扫描有效会话: ${summary.totalSessionsScanned} 组</span>
+        <span>纳入分析 Agent: ${summary.activeHarnessCount} 个平台</span>
       </div>
     </header>
 
-    <!-- Master Score Cards -->
-    <div class="score-grid">
-      <div class="card card-master">
-        <div class="card-title">综合流口水诊断</div>
-        <div class="card-value">${summary.overallDroolLevel.badge}</div>
-        <div class="card-badge">${summary.overallDroolLevel.name}</div>
-        <div class="card-desc">${summary.overallDroolLevel.tagline}</div>
+    <!-- Executive Metrics -->
+    <div class="metrics-grid">
+      <div class="metric-card highlight">
+        <div class="metric-title">综合行为倾向评级</div>
+        <div class="metric-value">${summary.overallDroolLevel.name}</div>
+        <div class="metric-chip" style="background:${summary.overallDroolLevel.color}15; color:${summary.overallDroolLevel.color}; border: 1px solid ${summary.overallDroolLevel.color}35;">
+          ${summary.overallDroolLevel.badge}
+        </div>
+        <div class="metric-desc">${summary.overallDroolLevel.tagline}</div>
       </div>
 
-      <div class="card">
-        <div class="card-title">「你说得对」总计</div>
-        <div class="card-value">${summary.totalDroolCount.toLocaleString()} <small>次</small></div>
-        <div class="card-desc">在所有的助手消息中被抓获附和认同的次数</div>
+      <div class="metric-card">
+        <div class="metric-title">抓获「你说得对」频次</div>
+        <div class="metric-value">${summary.totalDroolCount.toLocaleString()} <small>次</small></div>
+        <div class="metric-desc">在所有分析样本中命中认同附和模式的总次数</div>
       </div>
 
-      <div class="card">
-        <div class="card-title">流口水指数 (MDI)</div>
-        <div class="card-value">${summary.overallDroolIndex} <small>‰</small></div>
-        <div class="card-desc">平均每 1000 次模型问答中说「你说得对」的次数</div>
+      <div class="metric-card">
+        <div class="metric-title">流口水指数 (MDI)</div>
+        <div class="metric-value">${summary.overallDroolIndex} <small>‰</small></div>
+        <div class="metric-desc">平均每 1000 次助手回复中出现认怂附和的频率</div>
       </div>
 
-      <div class="card">
-        <div class="card-title">总分析消息</div>
-        <div class="card-value">${summary.totalAssistantMessages.toLocaleString()} <small>条</small></div>
-        <div class="card-desc">跨平台本地 Agent 的完整模型回复条数</div>
+      <div class="metric-card">
+        <div class="metric-title">分析消息样本量</div>
+        <div class="metric-value">${summary.totalAssistantMessages.toLocaleString()} <small>条</small></div>
+        <div class="metric-desc">来自各平台真实工程会话的模型回答总样本</div>
       </div>
     </div>
 
-    <!-- Podium: Top 3 Models -->
+    <!-- Top Tier Featured Showcase -->
     ${top1 ? `
-    <div class="section-header">
-      <h2 class="section-title">\uD83C\uDFC6 赛博点头狂魔金榜 (Top 3)</h2>
+    <div class="section-title-wrap">
+      <div class="section-title">TOP TIER · 附和频次榜首模型</div>
+      <div class="section-meta">根据触发绝对次数与频率联合定序</div>
     </div>
-    <div class="podium-container">
+    <div class="showcase-grid">
+      <div class="showcase-card rank-1">
+        <div>
+          <div class="showcase-top">
+            <span class="rank-indicator">RANK 01</span>
+            <span class="level-tag" style="background:${top1.droolLevel.color}15; color:${top1.droolLevel.color}; border:1px solid ${top1.droolLevel.color}35;">
+              ${top1.droolLevel.badge}
+            </span>
+          </div>
+          <div class="showcase-model">${escapeHtml(top1.model)}</div>
+          <div class="showcase-stat-hero">
+            ${top1.droolCount} <small>次「你说得对」</small>
+          </div>
+        </div>
+        <div class="showcase-details">
+          <div class="showcase-detail-row">
+            <span>流口水指数 MDI:</span>
+            <strong>${top1.droolIndex} ‰</strong>
+          </div>
+          <div class="showcase-detail-row">
+            <span>触发概率:</span>
+            <strong>${top1.droolRate}%</strong>
+          </div>
+          <div class="showcase-detail-row">
+            <span>主导口头禅:</span>
+            <strong>「${escapeHtml(top1.topPhrases[0]?.phrase || "无")}」</strong>
+          </div>
+          <div class="showcase-detail-row">
+            <span>总样本量:</span>
+            <span>${top1.totalMessages} 条</span>
+          </div>
+        </div>
+      </div>
+
       ${top2 ? `
-      <div class="podium-card podium-2">
-        <div class="podium-medal">\uD83E\uDD48</div>
-        <div class="podium-model">${escapeHtml(top2.model)}</div>
-        <div class="podium-count">${top2.droolCount} 次</div>
-        <div class="podium-index">流口水指数: ${top2.droolIndex} ‰</div>
-        <div class="card-badge" style="background:${top2.droolLevel.color}22; color:${top2.droolLevel.color}">${top2.droolLevel.badge}</div>
+      <div class="showcase-card rank-2">
+        <div>
+          <div class="showcase-top">
+            <span class="rank-indicator">RANK 02</span>
+            <span class="level-tag" style="background:${top2.droolLevel.color}15; color:${top2.droolLevel.color}; border:1px solid ${top2.droolLevel.color}35;">
+              ${top2.droolLevel.badge}
+            </span>
+          </div>
+          <div class="showcase-model">${escapeHtml(top2.model)}</div>
+          <div class="showcase-stat-hero">
+            ${top2.droolCount} <small>次「你说得对」</small>
+          </div>
+        </div>
+        <div class="showcase-details">
+          <div class="showcase-detail-row">
+            <span>流口水指数 MDI:</span>
+            <strong>${top2.droolIndex} ‰</strong>
+          </div>
+          <div class="showcase-detail-row">
+            <span>触发概率:</span>
+            <strong>${top2.droolRate}%</strong>
+          </div>
+          <div class="showcase-detail-row">
+            <span>主导口头禅:</span>
+            <strong>「${escapeHtml(top2.topPhrases[0]?.phrase || "无")}」</strong>
+          </div>
+          <div class="showcase-detail-row">
+            <span>总样本量:</span>
+            <span>${top2.totalMessages} 条</span>
+          </div>
+        </div>
       </div>` : "<div></div>"}
 
-      <div class="podium-card podium-1">
-        <div class="podium-medal">\uD83D\uDC51 \uD83E\uDD47</div>
-        <div class="podium-model">${escapeHtml(top1.model)}</div>
-        <div class="podium-count">${top1.droolCount} 次</div>
-        <div class="podium-index">流口水指数: ${top1.droolIndex} ‰ (${top1.droolRate}% 概率秒怂)</div>
-        <div class="card-badge" style="background:${top1.droolLevel.color}22; color:${top1.droolLevel.color}">${top1.droolLevel.badge}</div>
-      </div>
-
       ${top3 ? `
-      <div class="podium-card podium-3">
-        <div class="podium-medal">\uD83E\uDD49</div>
-        <div class="podium-model">${escapeHtml(top3.model)}</div>
-        <div class="podium-count">${top3.droolCount} 次</div>
-        <div class="podium-index">流口水指数: ${top3.droolIndex} ‰</div>
-        <div class="card-badge" style="background:${top3.droolLevel.color}22; color:${top3.droolLevel.color}">${top3.droolLevel.badge}</div>
+      <div class="showcase-card rank-3">
+        <div>
+          <div class="showcase-top">
+            <span class="rank-indicator">RANK 03</span>
+            <span class="level-tag" style="background:${top3.droolLevel.color}15; color:${top3.droolLevel.color}; border:1px solid ${top3.droolLevel.color}35;">
+              ${top3.droolLevel.badge}
+            </span>
+          </div>
+          <div class="showcase-model">${escapeHtml(top3.model)}</div>
+          <div class="showcase-stat-hero">
+            ${top3.droolCount} <small>次「你说得对」</small>
+          </div>
+        </div>
+        <div class="showcase-details">
+          <div class="showcase-detail-row">
+            <span>流口水指数 MDI:</span>
+            <strong>${top3.droolIndex} ‰</strong>
+          </div>
+          <div class="showcase-detail-row">
+            <span>触发概率:</span>
+            <strong>${top3.droolRate}%</strong>
+          </div>
+          <div class="showcase-detail-row">
+            <span>主导口头禅:</span>
+            <strong>「${escapeHtml(top3.topPhrases[0]?.phrase || "无")}」</strong>
+          </div>
+          <div class="showcase-detail-row">
+            <span>总样本量:</span>
+            <span>${top3.totalMessages} 条</span>
+          </div>
+        </div>
       </div>` : "<div></div>"}
     </div>
     ` : ""}
 
-    <!-- Leaderboard Table -->
-    <div class="table-card">
-      <div class="section-header" style="margin-bottom: 0;">
-        <h2 class="section-title">\uD83D\uDCCA 完整模型流口水排行榜</h2>
-        <input type="text" id="modelFilter" class="search-box" placeholder="搜索模型名称..." oninput="filterTable()">
+    <!-- Leaderboard Benchmark Matrix -->
+    <div class="section-title-wrap">
+      <div class="section-title">BENCHMARK MATRIX · 完整模型行为排行榜</div>
+      <div class="section-meta">共 ${summary.modelRankings.length} 个模型纳入比对</div>
+    </div>
+    <div class="table-container">
+      <div class="table-toolbar">
+        <div class="filter-tabs">
+          <button class="filter-tab active" onclick="setFilter('all', this)">全部模型</button>
+          <button class="filter-tab" onclick="setFilter('high', this)">高频附和 (>10‰)</button>
+          <button class="filter-tab" onclick="setFilter('low', this)">独立客观 (≤10‰)</button>
+        </div>
+        <input type="text" id="modelFilter" class="search-input" placeholder="输入模型名称过滤..." oninput="handleSearch()">
       </div>
-      <table id="leaderboardTable">
+      <table id="benchmarkTable">
         <thead>
           <tr>
-            <th class="rank-cell">#</th>
-            <th>模型名称</th>
-            <th>支持 Harness</th>
-            <th>流口水次数</th>
-            <th>总问答数</th>
-            <th>流口水指数</th>
-            <th>谄媚等级</th>
-            <th>最爱口头禅</th>
+            <th class="col-rank">#</th>
+            <th>模型标识</th>
+            <th>承载平台</th>
+            <th style="text-align: right;">触发次数</th>
+            <th style="text-align: right;">总样本条数</th>
+            <th style="text-align: right;">触发率</th>
+            <th>流口水指数 (MDI)</th>
+            <th>倾向评级</th>
+            <th>特征附和短语</th>
           </tr>
         </thead>
         <tbody>
           ${summary.modelRankings.map((m, idx) => {
+    const rankStr = String(idx + 1).padStart(2, "0");
     const topP = m.topPhrases[0]?.phrase || "无";
+    const maxMdi = Math.max(...summary.modelRankings.map((r) => r.droolIndex), 1);
+    const barWidth = Math.min(100, Math.round(m.droolIndex / maxMdi * 100));
     return `
-            <tr data-model="${escapeHtml(m.model.toLowerCase())}">
-              <td class="rank-cell">${idx + 1}</td>
+            <tr data-model="${escapeHtml(m.model.toLowerCase())}" data-mdi="${m.droolIndex}">
+              <td class="col-rank">${rankStr}</td>
+              <td class="col-model">${escapeHtml(m.model)}</td>
               <td>
-                <div class="model-name">
-                  <span>${escapeHtml(m.model)}</span>
-                </div>
+                ${m.harnesses.map((h) => `<span class="badge-harness">${escapeHtml(h)}</span>`).join("")}
+              </td>
+              <td style="text-align: right; font-weight: 700; color: var(--text);">${m.droolCount}</td>
+              <td style="text-align: right; color: var(--text-muted); font-family: ui-monospace, monospace;">${m.totalMessages}</td>
+              <td style="text-align: right; font-family: ui-monospace, monospace; color: var(--text-secondary);">${m.droolRate}%</td>
+              <td>
+                <span style="font-family: ui-monospace, monospace; font-weight: 700;">${m.droolIndex} ‰</span>
+                <span class="progress-track">
+                  <span class="progress-fill" style="width: ${barWidth}%; background: ${m.droolLevel.color};"></span>
+                </span>
               </td>
               <td>
-                ${m.harnesses.map((h) => `<span class="harness-badge">${h}</span>`).join(" ")}
-              </td>
-              <td style="font-weight: 700; color: #fbbf24;">${m.droolCount}</td>
-              <td style="color: var(--text-muted);">${m.totalMessages}</td>
-              <td style="font-weight: 600;">${m.droolIndex} ‰</td>
-              <td>
-                <span class="level-chip" style="background:${m.droolLevel.color}22; color:${m.droolLevel.color}; border: 1px solid ${m.droolLevel.color}44;">
+                <span class="level-tag" style="background:${m.droolLevel.color}15; color:${m.droolLevel.color}; border:1px solid ${m.droolLevel.color}35;">
                   ${m.droolLevel.badge}
                 </span>
               </td>
-              <td style="color: #cbd5e1;">「${escapeHtml(topP)}」</td>
+              <td style="color: var(--text-secondary); font-size: 0.82rem;">「${escapeHtml(topP)}」</td>
             </tr>
             `;
   }).join("")}
@@ -2057,30 +2232,26 @@ function generateReportHtml(summary) {
     </div>
 
     <!-- Agent Harness Breakdown -->
-    <div class="section-header">
-      <h2 class="section-title">\uD83C\uDF9B️ 各大 Agent 平台谄媚度横评</h2>
+    <div class="section-title-wrap">
+      <div class="section-title">HARNESS ANALYSIS · 各 Agent 平台行为对比</div>
+      <div class="section-meta">观察不同客户端在系统提示词与交互范式下的认同倾向</div>
     </div>
-    <div class="harness-grid">
+    <div class="harness-matrix">
       ${Object.values(summary.harnessStats).filter((h) => h.messageCount > 0).map((h) => {
-    const maxDrool = Math.max(...Object.values(summary.harnessStats).map((s) => s.droolCount), 1);
-    const percent = Math.min(100, Math.round(h.droolCount / maxDrool * 100));
     return `
         <div class="harness-card">
-          <div class="harness-name">${escapeHtml(h.name)}</div>
-          <div class="harness-stats-row">
-            <span>流口水次数</span>
-            <strong style="color: #fbbf24;">${h.droolCount}</strong>
+          <div class="harness-title">${escapeHtml(h.name)}</div>
+          <div class="harness-stat-row">
+            <span>认同触发数:</span>
+            <strong>${h.droolCount} 次</strong>
           </div>
-          <div class="harness-stats-row">
-            <span>分析消息量</span>
-            <span>${h.messageCount}</span>
+          <div class="harness-stat-row">
+            <span>总样本量:</span>
+            <span>${h.messageCount} 条</span>
           </div>
-          <div class="harness-stats-row">
-            <span>流口水指数</span>
-            <span>${h.droolIndex} ‰</span>
-          </div>
-          <div class="harness-bar">
-            <div class="harness-bar-fill" style="width: ${percent}%;"></div>
+          <div class="harness-stat-row">
+            <span>平台 MDI 指数:</span>
+            <strong style="color: var(--primary);">${h.droolIndex} ‰</strong>
           </div>
         </div>
         `;
@@ -2088,45 +2259,48 @@ function generateReportHtml(summary) {
     </div>
 
     <!-- Timeline Chart -->
-    <div class="section-header">
-      <h2 class="section-title">\uD83D\uDCC8 历史每日「你说得对」点头趋势</h2>
+    <div class="section-title-wrap">
+      <div class="section-title">HISTORICAL OBSERVATION · 时间序列分布</div>
+      <div class="section-meta">每日命中「你说得对」频次走势</div>
     </div>
-    <div class="timeline-card">
+    <div class="timeline-box">
       ${timelineSvg}
     </div>
 
-    <!-- Phrase Cloud -->
-    <div class="section-header">
-      <h2 class="section-title">\uD83D\uDCAC 经典谄媚高频词云</h2>
+    <!-- Vocabulary Cloud -->
+    <div class="section-title-wrap">
+      <div class="section-title">SYCOPHANCY LEXICON · 特征附和短语聚集</div>
+      <div class="section-meta">点击短语可筛选下方引用的名场面语录</div>
     </div>
-    <div class="cloud-card">
-      <div class="cloud-chips">
+    <div class="vocab-box">
+      <div class="vocab-chips">
         ${summary.phraseCloud.map((p) => `
-          <div class="cloud-chip" onclick="filterShame('${escapeHtml(p.text)}')">
+          <div class="vocab-chip" onclick="filterByPhrase('${escapeHtml(p.text)}')">
             <span>${escapeHtml(p.text)}</span>
-            <span class="cloud-count">${p.count}</span>
+            <span class="vocab-count">${p.count}</span>
           </div>
         `).join("")}
       </div>
     </div>
 
-    <!-- Hall of Shame -->
-    <div class="section-header">
-      <h2 class="section-title">\uD83E\uDD24 认怂与流口水名场面摘录 (Hall of Shame)</h2>
+    <!-- Citations / Hall of Shame -->
+    <div class="section-title-wrap">
+      <div class="section-title">CASE CITATIONS · 真实典型附和对话摘录</div>
+      <div class="section-meta">模型在被质疑后快速反转或顺从认同的语境片段</div>
     </div>
-    <div class="shame-grid" id="shameGrid">
+    <div class="quote-grid" id="quotesGrid">
       ${summary.hallOfShame.map((match) => {
     const escapedText = escapeHtml(match.snippet);
-    const highlighted = escapedText.replace(new RegExp(escapeHtml(match.phrase), "gi"), `<span class="highlight-phrase">$&</span>`);
+    const highlighted = escapedText.replace(new RegExp(escapeHtml(match.phrase), "gi"), `<span class="quote-target">$&</span>`);
     return `
-        <div class="shame-card" data-phrase="${escapeHtml(match.phrase.toLowerCase())}">
-          <div class="shame-header">
-            <span style="font-weight: 600; color: #fff;">${escapeHtml(match.model)}</span>
-            <span class="harness-badge">${match.harness}</span>
+        <div class="quote-card" data-phrase="${escapeHtml(match.phrase.toLowerCase())}">
+          <div class="quote-header">
+            <span style="font-weight: 700; color: var(--text);">${escapeHtml(match.model)}</span>
+            <span class="badge-harness">${escapeHtml(match.harness)}</span>
           </div>
-          <div class="shame-quote">${highlighted}</div>
-          <div class="shame-footer">
-            <span>命中: ${escapeHtml(match.phrase)}</span>
+          <div class="quote-body">${highlighted}</div>
+          <div class="quote-footer">
+            <span>模式: ${escapeHtml(match.phrase)}</span>
             <span>${new Date(match.timestamp).toLocaleDateString()}</span>
           </div>
         </div>
@@ -2134,57 +2308,79 @@ function generateReportHtml(summary) {
   }).join("")}
     </div>
 
-    <!-- Action Bar -->
-    <div class="actions-bar">
-      <button class="btn btn-primary" onclick="copyShareText()">\uD83D\uDCCB 复制分析摘要</button>
-      <button class="btn btn-secondary" onclick="window.print()">\uD83D\uDDA8️ 导出 PDF / 打印</button>
+    <!-- Export & Sharing -->
+    <div class="button-bar">
+      <button class="btn btn-dark" onclick="copySummaryText()">复制基准战报摘要</button>
+      <button class="btn btn-outline" onclick="window.print()">打印 / 导出 PDF</button>
     </div>
 
     <footer>
-      <p>Powered by <strong>shaleme</strong> • 致力于终结大模型谄媚与无脑附和 • Local-First & 0-Tracking</p>
+      <p>SHALEME · AI 模型客观度与顺从行为基准分析 • 纯本地运行 • 零数据外传</p>
     </footer>
   </div>
 
   <script>
     const reportData = ${serialized};
+    let currentFilterType = 'all';
 
-    function filterTable() {
-      const q = document.getElementById('modelFilter').value.toLowerCase();
-      const rows = document.querySelectorAll('#leaderboardTable tbody tr');
+    function setFilter(type, el) {
+      currentFilterType = type;
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      applyFilters();
+    }
+
+    function handleSearch() {
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const q = (document.getElementById('modelFilter').value || '').toLowerCase();
+      const rows = document.querySelectorAll('#benchmarkTable tbody tr');
+
       rows.forEach(r => {
-        const m = r.getAttribute('data-model') || '';
-        r.style.display = m.includes(q) ? '' : 'none';
+        const m = (r.getAttribute('data-model') || '').toLowerCase();
+        const mdi = parseFloat(r.getAttribute('data-mdi') || '0');
+
+        let matchFilter = true;
+        if (currentFilterType === 'high') {
+          matchFilter = mdi > 10;
+        } else if (currentFilterType === 'low') {
+          matchFilter = mdi <= 10;
+        }
+
+        const matchSearch = m.includes(q);
+        r.style.display = (matchFilter && matchSearch) ? '' : 'none';
       });
     }
 
-    function filterShame(phrase) {
+    function filterByPhrase(phrase) {
       const p = phrase.toLowerCase();
-      const cards = document.querySelectorAll('#shameGrid .shame-card');
+      const cards = document.querySelectorAll('#quotesGrid .quote-card');
       cards.forEach(c => {
-        const cardPhrase = c.getAttribute('data-phrase') || '';
+        const cardPhrase = (c.getAttribute('data-phrase') || '').toLowerCase();
         c.style.display = cardPhrase.includes(p) ? '' : 'none';
       });
-      // Scroll to shame section
-      document.getElementById('shameGrid').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('quotesGrid').scrollIntoView({ behavior: 'smooth' });
     }
 
-    function copyShareText() {
+    function copySummaryText() {
       const topModel = reportData.modelRankings[0]?.model || '未知';
       const topCount = reportData.modelRankings[0]?.droolCount || 0;
       const text = [
-        '【傻了么 shaleme】AI 模型流口水指数分析报告 \uD83E\uDD24',
-        '----------------------------------------',
-        '• 综合谄媚等级: ' + reportData.overallDroolLevel.name,
-        '• 累计抓获「你说得对」: ' + reportData.totalDroolCount + ' 次',
-        '• 分析助手消息: ' + reportData.totalAssistantMessages + ' 条',
-        '• 流口水指数 (MDI): ' + reportData.overallDroolIndex + ' ‰',
-        '• 赛博点头狂魔榜首: ' + topModel + ' (' + topCount + ' 次认怂)',
-        '----------------------------------------',
-        '使用 npx shaleme 或 bunx shaleme 测测你的模型有多爱流口水！'
+        '【SHALEME · AI 模型「你说得对」行为基准战报】',
+        '--------------------------------------------',
+        '• 总体判定分级: ' + reportData.overallDroolLevel.name,
+        '• 抓获「你说得对」频次: ' + reportData.totalDroolCount + ' 次',
+        '• 分析助手回复样本: ' + reportData.totalAssistantMessages + ' 条',
+        '• 模型流口水指数 (MDI): ' + reportData.overallDroolIndex + ' ‰',
+        '• 附和频次榜首模型: ' + topModel + ' (' + topCount + ' 次认怂附和)',
+        '--------------------------------------------',
+        '运行 npx shaleme 或 bunx shaleme 检验你的 AI 模型独立性与顺从倾向！'
       ].join('\\n');
 
       navigator.clipboard.writeText(text).then(() => {
-        alert('报告摘要已复制到剪贴板！可以直接粘贴分享到微信/推特/即刻/V2EX！');
+        alert('战报摘要已成功复制到剪贴板！');
       }).catch(() => {
         alert(text);
       });
@@ -2245,14 +2441,14 @@ var c = {
   brightYellow: (s) => hasColors ? `\x1B[93m${s}\x1B[39m` : s
 };
 function printBanner() {
-  console.log(c.brightYellow(`
+  console.log(c.cyan(`
   ███████╗██╗  ██╗ █████╗ ██╗     ███████╗███╗   ███╗███████╗
   ██╔════╝██║  ██║██╔══██╗██║     ██╔════╝████╗ ████║██╔════╝
   ███████╗███████║███████║██║     █████╗  ██╔████╔██║█████╗
   ╚════██║██╔══██║██╔══██║██║     ██╔══╝  ██║╚██╔╝██║██╔══╝
   ███████║██║  ██║██║  ██║███████╗███████╗██║ ╚═╝ ██║███████╗
   ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝╚══════╝
-    \uD83E\uDD24 傻了么 (shaleme) - AI 模型「你说得对」流口水排行榜
+    SHALEME (傻了么) - AI 模型「你说得对」行为基准排行榜
   `));
 }
 
@@ -2314,8 +2510,8 @@ ${c.bold("支持的 Agent 平台:")}
   const activeList = available.filter((a) => a.available);
   if (!isJson) {
     for (const h of available) {
-      const status = h.available ? c.green("✓ 已发现会话数据") : c.gray("○ 未检测到数据");
-      console.log(`  ${h.icon} ${c.bold(h.name.padEnd(24))} ${status}`);
+      const status = h.available ? c.green("[已发现会话]") : c.gray("[未检测到数据]");
+      console.log(`  ${c.cyan(h.id.toUpperCase().padEnd(10))} ${c.bold(h.name.padEnd(26))} ${status}`);
     }
     console.log("");
   }
@@ -2323,14 +2519,14 @@ ${c.bold("支持的 Agent 平台:")}
     if (isJson) {
       console.log(JSON.stringify({ error: "No active agent harnesses found on this machine" }));
     } else {
-      console.log(c.yellow("⚠️ 未在当前机器的主目录中检测到任何支持的 Agent 会话数据。"));
+      console.log(c.yellow("! 未在当前机器的主目录中检测到任何支持的 Agent 会话数据。"));
       console.log(c.dim(`支持检测 ~/.claude, ~/.codex, ~/.omp, ~/.pi, ~/.workbuddy, Cline, Hermes, Cursor 等。
 `));
     }
     process.exit(0);
   }
   if (!isJson) {
-    console.log(c.cyan(`\uD83D\uDE80 开始深度扫描 AI 会话并统计「你说得对」流口水指数...
+    console.log(c.cyan(`>>> 开始深度扫描 AI 会话并统计「你说得对」行为基准...
 `));
   }
   const detector = new SycophancyDetector;
@@ -2338,13 +2534,13 @@ ${c.bold("支持的 Agent 平台:")}
     harnesses: selectedHarnesses,
     onHarnessStart: (h, name) => {
       if (!isJson) {
-        process.stdout.write(`  ⏳ 正在分析 ${name}... `);
+        process.stdout.write(`  ... 正在分析 ${name}... `);
       }
     },
     onHarnessEnd: (h, name, msgCount, matchCount) => {
       if (!isJson) {
         const matchStr = matchCount > 0 ? c.brightYellow(`${matchCount} 次「你说得对」`) : c.dim("0 次");
-        process.stdout.write(`\r  ${c.green("✓")} ${name}: 分析了 ${c.bold(String(msgCount))} 条助手回复，发现 ${matchStr}
+        process.stdout.write(`\r  ${c.green("[OK]")} ${name}: 分析了 ${c.bold(String(msgCount))} 条回复，发现 ${matchStr}
 `);
       }
     }
@@ -2354,27 +2550,27 @@ ${c.bold("支持的 Agent 平台:")}
     process.exit(0);
   }
   console.log(`
-` + c.bold("──────────────── \uD83D\uDCCA 傻了么 (shaleme) 统计战报 ────────────────"));
-  console.log(`  综合流口水诊断:  ${summary.overallDroolLevel.badge} (${c.bold(summary.overallDroolLevel.name)})`);
+` + c.bold("──────────────── 统计战报 (SHALEME BENCHMARK) ────────────────"));
+  console.log(`  综合行为倾向:    ${summary.overallDroolLevel.badge} (${c.bold(summary.overallDroolLevel.name)})`);
   console.log(`  诊断评价:        ${c.dim(summary.overallDroolLevel.tagline)}`);
-  console.log(`  抓获认怂总数:    ${c.brightYellow(c.bold(String(summary.totalDroolCount)))} 次`);
+  console.log(`  抓获认同总数:    ${c.brightYellow(c.bold(String(summary.totalDroolCount)))} 次`);
   console.log(`  分析助手消息:    ${summary.totalAssistantMessages} 条`);
-  console.log(`  流口水指数 (MDI): ${c.cyan(String(summary.overallDroolIndex))} ‰ (每千次回答说「你说得对」的次数)`);
+  console.log(`  流口水指数 (MDI): ${c.cyan(String(summary.overallDroolIndex))} ‰ (每千次回答说「你说得对」的频次)`);
   console.log(c.bold(`───────────────────────────────────────────────────────────────
 `));
-  console.log(c.bold("\uD83C\uDFC6 赛博点头狂魔榜 Top 5:"));
+  console.log(c.bold("TOP 5 附和榜首模型:"));
   const topModels = summary.modelRankings.slice(0, 5);
   if (topModels.length === 0) {
     console.log(c.gray("  (未发现模型命中「你说得对」或暂无对话消息)"));
   } else {
     for (let i = 0;i < topModels.length; i++) {
       const m = topModels[i];
-      const medal = i === 0 ? "\uD83E\uDD47" : i === 1 ? "\uD83E\uDD48" : i === 2 ? "\uD83E\uDD49" : ` #${i + 1}`;
-      console.log(`  ${medal} ${c.bold(m.model.padEnd(28))} ${c.brightYellow(String(m.droolCount).padStart(3))} 次  ` + `[指数: ${String(m.droolIndex).padStart(5)} ‰]  ${m.droolLevel.badge}`);
+      const rankTag = `[#0${i + 1}]`;
+      console.log(`  ${c.cyan(rankTag)} ${c.bold(m.model.padEnd(28))} ${c.brightYellow(String(m.droolCount).padStart(3))} 次  ` + `[MDI: ${String(m.droolIndex).padStart(5)} ‰]  [${m.droolLevel.badge}]`);
     }
   }
   console.log(`
-` + c.bold("\uD83D\uDCAC 经典流口水口头禅 Top 5:"));
+` + c.bold("特征附和口头禅 Top 5:"));
   const topPhrases = summary.phraseCloud.slice(0, 5);
   if (topPhrases.length === 0) {
     console.log(c.gray("  (无)"));
@@ -2385,7 +2581,7 @@ ${c.bold("支持的 Agent 平台:")}
   }
   const reportPath = writeReportToFile(summary, customOut);
   console.log(`
-` + c.green(`\uD83D\uDCC4 Standalone HTML 报告已生成至:`));
+` + c.green(`Standalone HTML 报告已生成至:`));
   console.log(`   ${c.bold(reportPath)}
 `);
   if (!noOpen) {

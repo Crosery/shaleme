@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "shaleme": "./bin/shaleme.js"
+    "shaleme": "bin/shaleme.js"
   },
   "files": [
     "bin",
@@ -45,6 +45,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Crosery/shaleme.git"
+    "url": "git+https://github.com/Crosery/shaleme.git"
   }
 }
