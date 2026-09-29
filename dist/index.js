@@ -1417,7 +1417,7 @@ async function runUnifiedScan(options = {}, detector = new SycophancyDetector) {
   const overallDroolIndex = totalAssistantMessages > 0 ? Number((totalDroolCount / totalAssistantMessages * 1000).toFixed(2)) : 0;
   const overallDroolLevel = getDroolLevel(overallDroolIndex);
   return {
-    version: "0.1.1",
+    version: "0.1.2",
     generatedAt: Date.now(),
     generatedDate: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
     totalDroolCount,
@@ -2610,7 +2610,7 @@ ${c.bold("支持的 Agent 平台:")}
     process.exit(0);
   }
   if (args.includes("--version") || args.includes("-v")) {
-    console.log("shaleme v0.1.1");
+    console.log("shaleme v0.1.2");
     process.exit(0);
   }
   const isJson = args.includes("--json");
