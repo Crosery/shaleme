@@ -84,6 +84,42 @@ export interface DailyPoint {
   count: number;
 }
 
+/**
+ * Per-model figures as submitted to a leaderboard.
+ *
+ * Deliberately small and flat: it crosses a network boundary and is stored in a
+ * leaderboard row, so it carries only what the ranking and the per-model table
+ * need — not the phrase breakdown or the quotes.
+ */
+export interface ModelLeaderboardEntry {
+  model: string;
+  droolCount: number;
+  totalMessages: number;
+  mdi: number;
+}
+
+/**
+ * What a report contributes to a leaderboard.
+ *
+ * Mirrors the shape maleme submits (a small set of scalar metrics plus a
+ * per-model breakdown), so a leaderboard server can rank submissions without
+ * needing the full local report. Nothing here identifies a machine or a user;
+ * identity comes from whichever account the submitter authenticates with.
+ */
+export interface LeaderboardReportPayload {
+  version: string;
+  /** Total "你说得对"-class matches observed. */
+  droolCount: number;
+  /** Total assistant messages scanned, the denominator of MDI. */
+  assistantMessages: number;
+  /** Matches per thousand assistant messages. */
+  mdi: number;
+  sessionsScanned: number;
+  modelCount: number;
+  modelEntries: ModelLeaderboardEntry[];
+  generatedAt: number;
+}
+
 export interface ReportSummary {
   version: string;
   generatedAt: number;

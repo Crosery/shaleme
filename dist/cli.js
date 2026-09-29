@@ -1846,8 +1846,9 @@ function getDownloadsDir() {
   }
   return home;
 }
-function generateReportHtml(summary) {
+function generateReportHtml(summary, leaderboardEndpoint) {
   const serialized = JSON.stringify(summary).replace(/</g, "\\u003c");
+  const endpoint = leaderboardEndpoint ?? process.env.SHALEME_LEADERBOARD_URL ?? "";
   const top1 = summary.modelRankings[0];
   const top2 = summary.modelRankings[1];
   const top3 = summary.modelRankings[2];
@@ -2765,10 +2766,13 @@ function generateReportHtml(summary) {
     <div class="button-bar">
       <button class="btn btn-dark" onclick="copySummaryText()">复制基准战报摘要</button>
       <button class="btn btn-outline" onclick="window.print()">打印 / 导出 PDF</button>
+      <button class="btn btn-outline" onclick="exportPayload()">导出成绩 JSON</button>
+      <button class="btn btn-outline" onclick="submitToLeaderboard()">上传到榜单</button>
     </div>
 
     <footer>
       <p>SHALEME · AI 模型客观度与顺从行为基准分析 • 纯本地运行 • 零数据外传</p>
+      <p class="footer-note">分析全程在本机完成，报告不上传任何数据。只有你主动点击「上传到榜单」时，才会发送上方的汇总计数（模型名与次数，不含对话内容）。</p>
     </footer>
   </div>
 
@@ -2838,18 +2842,75 @@ function generateReportHtml(summary) {
         alert(text);
       });
     }
+
+    // Built once from the embedded report; this is the only data that can ever
+    // leave the machine, and only on an explicit click.
+    function buildPayload() {
+      return {
+        version: reportData.version,
+        droolCount: reportData.totalDroolCount,
+        assistantMessages: reportData.totalAssistantMessages,
+        mdi: reportData.overallDroolIndex,
+        sessionsScanned: reportData.totalSessionsScanned,
+        modelCount: reportData.modelRankings.length,
+        modelEntries: reportData.modelRankings.map(function (m) {
+          return {
+            model: m.model,
+            droolCount: m.droolCount,
+            totalMessages: m.totalMessages,
+            mdi: m.droolIndex,
+          };
+        }),
+        generatedAt: reportData.generatedAt,
+      };
+    }
+
+    function exportPayload() {
+      const payload = buildPayload();
+      const text = JSON.stringify(payload, null, 2);
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'shaleme-score.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function submitToLeaderboard() {
+      const endpoint = ${JSON.stringify(endpoint)};
+      if (!endpoint) {
+        alert('本报告未配置榜单地址。\\n\\n可先「导出成绩 JSON」，再到榜单页面手动上传。');
+        return;
+      }
+      const payload = buildPayload();
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = endpoint;
+      // Submit as a single JSON field so the server never has to know the
+      // individual metric names — the leaderboard owns that schema.
+      const field = document.createElement('input');
+      field.type = 'hidden';
+      field.name = 'payload';
+      field.value = JSON.stringify(payload);
+      form.appendChild(field);
+      document.body.appendChild(form);
+      form.submit();
+    }
   </script>
 </body>
 </html>`;
 }
-function writeReportToFile(summary, customPath) {
+function writeReportToFile(summary, customPath, leaderboardEndpoint) {
   let targetPath = customPath;
   if (!targetPath) {
     const downloads = getDownloadsDir();
     const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(/\..+/, "");
     targetPath = path14.join(downloads, `shaleme-report-${timestamp}.html`);
   }
-  const html = generateReportHtml(summary);
+  const html = generateReportHtml(summary, leaderboardEndpoint);
   fs14.writeFileSync(targetPath, html, "utf8");
   return targetPath;
 }
@@ -2997,6 +3058,7 @@ ${c.bold("选项:")}
   --harness <names>  限定分析特定的 Agent Harness (逗号分隔，如 claude,codex,omp,pi)
   --jobs <n>         并行扫描的工作线程数 (默认: CPU 核数 - 1，上限 8)
   --no-parallel      禁用并行扫描，单线程运行 (等同于 --jobs 1)
+  --leaderboard <url> 报告页「上传到榜单」的提交地址 (默认读 SHALEME_LEADERBOARD_URL)
   --help, -h         显示帮助信息
   --version, -v      显示版本号
 
@@ -3039,6 +3101,11 @@ ${c.bold("支持的 Agent 平台:")}
   }
   if (args.includes("--no-parallel"))
     jobs = 1;
+  let leaderboardUrl;
+  const lbIdx = args.indexOf("--leaderboard");
+  if (lbIdx !== -1 && args[lbIdx + 1] && !args[lbIdx + 1].startsWith("--")) {
+    leaderboardUrl = args[lbIdx + 1];
+  }
   if (!isJson) {
     printBanner();
     console.log(c.dim(`  正在检测本机已安装的 Coding Agent 平台...
@@ -3123,7 +3190,7 @@ ${c.bold("支持的 Agent 平台:")}
       console.log(`  • 「${c.cyan(p.text)}」: ${c.bold(String(p.count))} 次`);
     }
   }
-  const reportPath = writeReportToFile(summary, customOut);
+  const reportPath = writeReportToFile(summary, customOut, leaderboardUrl);
   console.log(`
 ` + c.green(`Standalone HTML 报告已生成至:`));
   console.log(`   ${c.bold(reportPath)}

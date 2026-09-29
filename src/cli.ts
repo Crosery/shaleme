@@ -42,6 +42,7 @@ ${c.bold('选项:')}
   --harness <names>  限定分析特定的 Agent Harness (逗号分隔，如 claude,codex,omp,pi)
   --jobs <n>         并行扫描的工作线程数 (默认: CPU 核数 - 1，上限 8)
   --no-parallel      禁用并行扫描，单线程运行 (等同于 --jobs 1)
+  --leaderboard <url> 报告页「上传到榜单」的提交地址 (默认读 SHALEME_LEADERBOARD_URL)
   --help, -h         显示帮助信息
   --version, -v      显示版本号
 
@@ -87,6 +88,12 @@ ${c.bold('支持的 Agent 平台:')}
     if (Number.isFinite(parsed) && parsed >= 1) jobs = Math.floor(parsed);
   }
   if (args.includes('--no-parallel')) jobs = 1;
+
+  let leaderboardUrl: string | undefined;
+  const lbIdx = args.indexOf('--leaderboard');
+  if (lbIdx !== -1 && args[lbIdx + 1] && !args[lbIdx + 1].startsWith('--')) {
+    leaderboardUrl = args[lbIdx + 1];
+  }
 
   if (!isJson) {
     printBanner();
@@ -191,7 +198,7 @@ ${c.bold('支持的 Agent 平台:')}
   }
 
   // Write HTML report
-  const reportPath = writeReportToFile(summary, customOut);
+  const reportPath = writeReportToFile(summary, customOut, leaderboardUrl);
   console.log('\n' + c.green(`Standalone HTML 报告已生成至:`));
   console.log(`   ${c.bold(reportPath)}\n`);
 

@@ -13,8 +13,11 @@ export function getDownloadsDir(): string {
   return home;
 }
 
-export function generateReportHtml(summary: ReportSummary): string {
+export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?: string): string {
   const serialized = JSON.stringify(summary).replace(/</g, '\\u003c');
+  // Empty string means "no leaderboard configured": the report still offers
+  // JSON export, and the submit button explains that instead of failing.
+  const endpoint = leaderboardEndpoint ?? process.env.SHALEME_LEADERBOARD_URL ?? '';
 
   // Featured models for top tier showcase
   const top1 = summary.modelRankings[0];
@@ -976,10 +979,13 @@ export function generateReportHtml(summary: ReportSummary): string {
     <div class="button-bar">
       <button class="btn btn-dark" onclick="copySummaryText()">复制基准战报摘要</button>
       <button class="btn btn-outline" onclick="window.print()">打印 / 导出 PDF</button>
+      <button class="btn btn-outline" onclick="exportPayload()">导出成绩 JSON</button>
+      <button class="btn btn-outline" onclick="submitToLeaderboard()">上传到榜单</button>
     </div>
 
     <footer>
       <p>SHALEME · AI 模型客观度与顺从行为基准分析 • 纯本地运行 • 零数据外传</p>
+      <p class="footer-note">分析全程在本机完成，报告不上传任何数据。只有你主动点击「上传到榜单」时，才会发送上方的汇总计数（模型名与次数，不含对话内容）。</p>
     </footer>
   </div>
 
@@ -1049,12 +1055,73 @@ export function generateReportHtml(summary: ReportSummary): string {
         alert(text);
       });
     }
+
+    // Built once from the embedded report; this is the only data that can ever
+    // leave the machine, and only on an explicit click.
+    function buildPayload() {
+      return {
+        version: reportData.version,
+        droolCount: reportData.totalDroolCount,
+        assistantMessages: reportData.totalAssistantMessages,
+        mdi: reportData.overallDroolIndex,
+        sessionsScanned: reportData.totalSessionsScanned,
+        modelCount: reportData.modelRankings.length,
+        modelEntries: reportData.modelRankings.map(function (m) {
+          return {
+            model: m.model,
+            droolCount: m.droolCount,
+            totalMessages: m.totalMessages,
+            mdi: m.droolIndex,
+          };
+        }),
+        generatedAt: reportData.generatedAt,
+      };
+    }
+
+    function exportPayload() {
+      const payload = buildPayload();
+      const text = JSON.stringify(payload, null, 2);
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'shaleme-score.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function submitToLeaderboard() {
+      const endpoint = ${JSON.stringify(endpoint)};
+      if (!endpoint) {
+        alert('本报告未配置榜单地址。\\n\\n可先「导出成绩 JSON」，再到榜单页面手动上传。');
+        return;
+      }
+      const payload = buildPayload();
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = endpoint;
+      // Submit as a single JSON field so the server never has to know the
+      // individual metric names — the leaderboard owns that schema.
+      const field = document.createElement('input');
+      field.type = 'hidden';
+      field.name = 'payload';
+      field.value = JSON.stringify(payload);
+      form.appendChild(field);
+      document.body.appendChild(form);
+      form.submit();
+    }
   </script>
 </body>
 </html>`;
 }
 
-export function writeReportToFile(summary: ReportSummary, customPath?: string): string {
+export function writeReportToFile(
+  summary: ReportSummary,
+  customPath?: string,
+  leaderboardEndpoint?: string,
+): string {
   let targetPath = customPath;
   if (!targetPath) {
     const downloads = getDownloadsDir();
@@ -1066,7 +1133,7 @@ export function writeReportToFile(summary: ReportSummary, customPath?: string): 
     targetPath = path.join(downloads, `shaleme-report-${timestamp}.html`);
   }
 
-  const html = generateReportHtml(summary);
+  const html = generateReportHtml(summary, leaderboardEndpoint);
   fs.writeFileSync(targetPath, html, 'utf8');
   return targetPath;
 }

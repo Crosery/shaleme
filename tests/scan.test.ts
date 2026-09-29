@@ -9,6 +9,7 @@ import {
 } from '../src/scan/aggregate';
 import { buildReportSummary, createEmptyHarnessStats } from '../src/scan/plan';
 import { ExtractedMessage } from '../src/types';
+import { buildLeaderboardPayload } from '../src/share/payload';
 
 function msg(over: Partial<ExtractedMessage> = {}): ExtractedMessage {
   return {
@@ -151,5 +152,52 @@ describe('buildReportSummary determinism', () => {
     expect(report.totalAssistantMessages).toBe(100);
     expect(report.totalDroolCount).toBe(5);
     expect(report.overallDroolIndex).toBe(50);
+  });
+});
+
+describe('buildLeaderboardPayload', () => {
+  it('carries counts and model names but no message text', () => {
+    const messages = [
+      msg({ sessionId: 's1', text: '你说得对，我改。这是很长的对话正文不该外传。' }),
+      msg({ sessionId: 's2', text: '好的。', model: 'gpt-6-astra' }),
+    ];
+    const report = buildReportSummary({
+      stats: run(messages),
+      harnessStats: createEmptyHarnessStats(),
+      activeHarnessCount: 1,
+      version: '0.1.2',
+    });
+    const payload = buildLeaderboardPayload(report);
+
+    expect(payload.droolCount).toBe(1);
+    expect(payload.assistantMessages).toBe(2);
+    expect(payload.modelCount).toBe(2);
+    expect(payload.modelEntries.map((m) => m.model).sort()).toEqual([
+      'claude-opus-5',
+      'gpt-6-astra',
+    ]);
+
+    // The submission must not leak conversation content. The report's own
+    // hallOfShame holds snippets, so assert the payload never serialises one.
+    const serialized = JSON.stringify(payload);
+    expect(serialized).not.toContain('不该外传');
+    expect(serialized).not.toContain('snippet');
+    expect(serialized).not.toContain('sessionId');
+    expect(serialized).not.toContain('hallOfShame');
+  });
+
+  it('reports MDI consistent with the summary', () => {
+    const messages = Array.from({ length: 50 }, (_, i) =>
+      msg({ sessionId: `s${i}`, text: i < 2 ? '你说得对' : '好的。' }),
+    );
+    const report = buildReportSummary({
+      stats: run(messages),
+      harnessStats: createEmptyHarnessStats(),
+      activeHarnessCount: 1,
+      version: '0.1.2',
+    });
+    const payload = buildLeaderboardPayload(report);
+    expect(payload.mdi).toBe(report.overallDroolIndex);
+    expect(payload.mdi).toBe(40);
   });
 });
