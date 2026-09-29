@@ -28,6 +28,10 @@ export function normalizeModelName(rawModel: string): string {
   return m.trim();
 }
 
+export function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')

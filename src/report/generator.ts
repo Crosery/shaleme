@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ReportSummary } from '../types';
-import { escapeHtml } from '../utils/text';
+import { escapeHtml, escapeRegex } from '../utils/text';
 
 export function getDownloadsDir(): string {
   const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
@@ -945,10 +945,16 @@ export function generateReportHtml(summary: ReportSummary): string {
       ${summary.hallOfShame
         .map((match) => {
           const escapedText = escapeHtml(match.snippet);
-          const highlighted = escapedText.replace(
-            new RegExp(escapeHtml(match.phrase), 'gi'),
-            `<span class="quote-target">$&</span>`,
-          );
+          const safePhrasePattern = escapeRegex(escapeHtml(match.phrase));
+          let highlighted = escapedText;
+          try {
+            highlighted = escapedText.replace(
+              new RegExp(safePhrasePattern, 'gi'),
+              `<span class="quote-target">$&</span>`,
+            );
+          } catch {
+            // Fallback if regex construction fails
+          }
           return `
         <div class="quote-card" data-phrase="${escapeHtml(match.phrase.toLowerCase())}">
           <div class="quote-header">

@@ -132,6 +132,10 @@ export async function runUnifiedScan(
       totalAssistantMessages++;
       sessionIds.add(msg.sessionId);
 
+      if (options.onProgress && (hMsgCount % 15 === 0 || hMsgCount === 1)) {
+        options.onProgress(adapter.id, hMsgCount, hMatchCount);
+      }
+
       const normModel = normalizeModelName(msg.model);
       modelMessageCounts.set(normModel, (modelMessageCounts.get(normModel) || 0) + 1);
 

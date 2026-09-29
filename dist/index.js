@@ -298,6 +298,9 @@ function normalizeModelName(rawModel) {
   }
   return m.trim();
 }
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
@@ -1325,6 +1328,9 @@ async function runUnifiedScan(options = {}, detector = new SycophancyDetector) {
       hMsgCount++;
       totalAssistantMessages++;
       sessionIds.add(msg.sessionId);
+      if (options.onProgress && (hMsgCount % 15 === 0 || hMsgCount === 1)) {
+        options.onProgress(adapter.id, hMsgCount, hMatchCount);
+      }
       const normModel = normalizeModelName(msg.model);
       modelMessageCounts.set(normModel, (modelMessageCounts.get(normModel) || 0) + 1);
       if (!modelHarnesses.has(normModel)) {
@@ -2320,7 +2326,11 @@ function generateReportHtml(summary) {
     <div class="quote-grid" id="quotesGrid">
       ${summary.hallOfShame.map((match) => {
     const escapedText = escapeHtml(match.snippet);
-    const highlighted = escapedText.replace(new RegExp(escapeHtml(match.phrase), "gi"), `<span class="quote-target">$&</span>`);
+    const safePhrasePattern = escapeRegex(escapeHtml(match.phrase));
+    let highlighted = escapedText;
+    try {
+      highlighted = escapedText.replace(new RegExp(safePhrasePattern, "gi"), `<span class="quote-target">$&</span>`);
+    } catch {}
     return `
         <div class="quote-card" data-phrase="${escapeHtml(match.phrase.toLowerCase())}">
           <div class="quote-header">
@@ -2478,15 +2488,81 @@ function printBanner() {
     SHALEME (傻了么) - AI 模型「你说得对」行为基准排行榜
   `));
 }
-function formatProgressBar(current, total, width = 30) {
-  const ratio = total > 0 ? Math.min(1, Math.max(0, current / total)) : 0;
-  const filled = Math.round(width * ratio);
-  const empty = width - filled;
-  const bar = c.brightYellow("━".repeat(filled)) + c.gray("─".repeat(empty));
-  const percent = Math.round(ratio * 100);
-  return `[${bar}] ${percent}%`;
+var SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+class RealtimeProgressBar {
+  frameIndex = 0;
+  timer = null;
+  currentName = "";
+  currentCount = 0;
+  currentMatches = 0;
+  active = false;
+  start(name) {
+    this.currentName = name;
+    this.currentCount = 0;
+    this.currentMatches = 0;
+    this.active = true;
+    this.render();
+    if (!this.timer) {
+      this.timer = setInterval(() => {
+        if (this.active) {
+          this.frameIndex = (this.frameIndex + 1) % SPINNER_FRAMES.length;
+          this.render();
+        }
+      }, 70);
+    }
+  }
+  update(count, matches) {
+    this.currentCount = count;
+    this.currentMatches = matches;
+    this.render();
+  }
+  stop(finalMessage) {
+    this.active = false;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    if (process.stdout.isTTY) {
+      process.stdout.write(`\r\x1B[2K${finalMessage}
+`);
+    } else {
+      console.log(finalMessage);
+    }
+  }
+  render() {
+    if (!this.active || !process.stdout.isTTY)
+      return;
+    const spinner = c.cyan(SPINNER_FRAMES[this.frameIndex]);
+    const nameStr = c.bold(this.currentName.padEnd(22));
+    const countStr = c.dim(`已读取 ${this.currentCount.toLocaleString()} 条`);
+    const matchStr = this.currentMatches > 0 ? c.brightYellow(`命中 ${this.currentMatches} 次`) : c.dim(`命中 0 次`);
+    const barWidth = 14;
+    const pulsePos = this.frameIndex * 2 % (barWidth + 4);
+    let barStr = "";
+    for (let i = 0;i < barWidth; i++) {
+      if (Math.abs(i - pulsePos) <= 1) {
+        barStr += c.cyan("━");
+      } else {
+        barStr += c.gray("─");
+      }
+    }
+    process.stdout.write(`\r\x1B[2K  ${spinner} ${nameStr} [${barStr}] ${countStr} | ${matchStr}`);
+  }
 }
 // src/cli.ts
+if (typeof process !== "undefined" && process.emitWarning) {
+  const origEmit = process.emitWarning;
+  process.emitWarning = (warning, ...args) => {
+    if (typeof warning === "string" && warning.includes("SQLite is an experimental feature")) {
+      return;
+    }
+    if (warning && typeof warning === "object" && warning.message && warning.message.includes("SQLite is an experimental feature")) {
+      return;
+    }
+    return origEmit.call(process, warning, ...args);
+  };
+}
 async function runCli() {
   const args = process.argv.slice(2);
   if (args.includes("--help") || args.includes("-h")) {
@@ -2564,18 +2640,23 @@ ${c.bold("支持的 Agent 平台:")}
 `));
   }
   const detector = new SycophancyDetector;
+  const progressBar = new RealtimeProgressBar;
   const summary = await runUnifiedScan({
     harnesses: selectedHarnesses,
     onHarnessStart: (h, name) => {
       if (!isJson) {
-        process.stdout.write(`  ... 正在分析 ${name}... `);
+        progressBar.start(name);
+      }
+    },
+    onProgress: (h, count, matchCount) => {
+      if (!isJson) {
+        progressBar.update(count, matchCount);
       }
     },
     onHarnessEnd: (h, name, msgCount, matchCount) => {
       if (!isJson) {
         const matchStr = matchCount > 0 ? c.brightYellow(`${matchCount} 次「你说得对」`) : c.dim("0 次");
-        process.stdout.write(`\r  ${c.green("[OK]")} ${name}: 分析了 ${c.bold(String(msgCount))} 条回复，发现 ${matchStr}
-`);
+        progressBar.stop(`  ${c.green("[OK]")} ${c.bold(name.padEnd(24))} 分析了 ${c.bold(String(msgCount).padStart(5))} 条回复，发现 ${matchStr}`);
       }
     }
   }, detector);
@@ -2640,12 +2721,13 @@ export {
   getDownloadsDir,
   getAllAdapters,
   generateReportHtml,
-  formatProgressBar,
   formatDate,
+  escapeRegex,
   escapeHtml,
   detectAvailableAdapters,
   c,
   SycophancyDetector,
+  RealtimeProgressBar,
   PiAdapter,
   OpenCodeAdapter,
   OpenClawAdapter,

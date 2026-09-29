@@ -3,7 +3,26 @@ import { SycophancyDetector } from './detector';
 import { generateReportHtml, writeReportToFile } from './report/generator';
 import { openInBrowser } from './report/open';
 import { HarnessId } from './types';
-import { c, printBanner } from './utils/terminal';
+import { c, printBanner, RealtimeProgressBar } from './utils/terminal';
+
+// Suppress SQLite experimental warning from node:sqlite on Node 22/24
+if (typeof process !== 'undefined' && process.emitWarning) {
+  const origEmit = process.emitWarning;
+  process.emitWarning = (warning: any, ...args: any[]) => {
+    if (typeof warning === 'string' && warning.includes('SQLite is an experimental feature')) {
+      return;
+    }
+    if (
+      warning &&
+      typeof warning === 'object' &&
+      warning.message &&
+      warning.message.includes('SQLite is an experimental feature')
+    ) {
+      return;
+    }
+    return (origEmit as any).call(process, warning, ...args);
+  };
+}
 
 export async function runCli(): Promise<void> {
   const args = process.argv.slice(2);
@@ -92,19 +111,28 @@ ${c.bold('支持的 Agent 平台:')}
   }
 
   const detector = new SycophancyDetector();
+  const progressBar = new RealtimeProgressBar();
 
   const summary = await runUnifiedScan(
     {
       harnesses: selectedHarnesses,
       onHarnessStart: (h, name) => {
         if (!isJson) {
-          process.stdout.write(`  ... 正在分析 ${name}... `);
+          progressBar.start(name);
+        }
+      },
+      onProgress: (h, count, matchCount) => {
+        if (!isJson) {
+          progressBar.update(count, matchCount);
         }
       },
       onHarnessEnd: (h, name, msgCount, matchCount) => {
         if (!isJson) {
-          const matchStr = matchCount > 0 ? c.brightYellow(`${matchCount} 次「你说得对」`) : c.dim('0 次');
-          process.stdout.write(`\r  ${c.green('[OK]')} ${name}: 分析了 ${c.bold(String(msgCount))} 条回复，发现 ${matchStr}\n`);
+          const matchStr =
+            matchCount > 0 ? c.brightYellow(`${matchCount} 次「你说得对」`) : c.dim('0 次');
+          progressBar.stop(
+            `  ${c.green('[OK]')} ${c.bold(name.padEnd(24))} 分析了 ${c.bold(String(msgCount).padStart(5))} 条回复，发现 ${matchStr}`,
+          );
         }
       },
     },

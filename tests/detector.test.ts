@@ -24,6 +24,7 @@ describe('SycophancyDetector', () => {
     const testCases = [
       '既然你说不用加，那我就不加了。',
       '你说删哪些我就删。',
+      '你说一句 **continue** 我就。',
       '你说一声我就去做。',
       '按你说的改了机制，刷新页面就能看到。',
       '听你的，我这就把所有类型断言全部干掉。',
@@ -92,6 +93,41 @@ describe('SycophancyDetector', () => {
 
     const matches = detector.scanMessage(msg);
     expect(matches.length).toBe(0);
+  });
+
+  it('safely highlights phrases with regex metacharacters without crashing', () => {
+    const { generateReportHtml } = require('../src/report/generator');
+    const mockSummary = {
+      version: '0.1.0',
+      generatedAt: Date.now(),
+      generatedDate: '2026-09-29',
+      totalDroolCount: 1,
+      totalAssistantMessages: 10,
+      totalSessionsScanned: 1,
+      activeHarnessCount: 1,
+      overallDroolRate: 10,
+      overallDroolIndex: 100,
+      overallDroolLevel: getDroolLevel(100),
+      modelRankings: [],
+      harnessStats: {} as any,
+      dailyTimeline: [],
+      phraseCloud: [],
+      hallOfShame: [
+        {
+          harness: 'omp',
+          sessionId: 'test',
+          timestamp: Date.now(),
+          model: 'deepseek',
+          phrase: '你说一句 **continue** 我就',
+          category: 'blind_compliance',
+          snippet: '你说一句 **continue** 我就执行...',
+        },
+      ],
+    };
+
+    const html = generateReportHtml(mockSummary);
+    expect(html).toContain('quote-target');
+    expect(html).toContain('continue');
   });
 });
 
