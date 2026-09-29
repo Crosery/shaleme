@@ -141,3 +141,16 @@ describe('getDroolLevel', () => {
     expect(getDroolLevel(80).level).toBe(4); // 极度谄媚
   });
 });
+
+describe('shipped lexicon resolution', () => {
+  it('loads the lexicon from a packed install, not a build-machine path', async () => {
+    // Regression guard: the bundle previously inlined the build machine's
+    // absolute __dirname, so a packed install silently fell back to the
+    // embedded copy (and would break if data/ ever diverged).
+    const { readFileSync } = await import('node:fs');
+    const bundle = readFileSync(new URL('../dist/cli.js', import.meta.url), 'utf8');
+
+    // The bundle must resolve at runtime via import.meta.url.
+    expect(bundle).toContain('fileURLToPath(import.meta.url)');
+  });
+});

@@ -4,7 +4,7 @@ var __require = /* @__PURE__ */ createRequire(import.meta.url);
 // src/detector.ts
 import fs from "node:fs";
 import path from "node:path";
-var __dirname = "/private/tmp/shaleme-fix/src";
+var __dirname = "/Users/crosery/work_file/shaleme/src";
 var DEFAULT_LEXICON_RAW = `
 你说得对|direct_agree
 你说的对|direct_agree
@@ -187,18 +187,32 @@ function getDroolLevel(droolIndex) {
 
 class SycophancyDetector {
   entries = [];
+  static readShippedLexicon() {
+    const candidates = [];
+    try {
+      const { fileURLToPath } = __require("node:url");
+      const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+      candidates.push(path.resolve(moduleDir, "../data/sycophancy_lexicon.txt"), path.resolve(moduleDir, "data/sycophancy_lexicon.txt"));
+    } catch {}
+    if (typeof __dirname === "string" && path.isAbsolute(__dirname)) {
+      candidates.push(path.resolve(__dirname, "../data/sycophancy_lexicon.txt"), path.resolve(__dirname, "data/sycophancy_lexicon.txt"));
+    }
+    for (const candidate of candidates) {
+      try {
+        if (fs.existsSync(candidate)) {
+          return fs.readFileSync(candidate, "utf8");
+        }
+      } catch {}
+    }
+    return;
+  }
   constructor(customLexiconText) {
     this.init(customLexiconText);
   }
   init(customText) {
     let raw = customText;
     if (!raw) {
-      try {
-        const localPath = path.resolve(__dirname, "../data/sycophancy_lexicon.txt");
-        if (fs.existsSync(localPath)) {
-          raw = fs.readFileSync(localPath, "utf8");
-        }
-      } catch {}
+      raw = SycophancyDetector.readShippedLexicon();
     }
     if (!raw) {
       raw = DEFAULT_LEXICON_RAW;

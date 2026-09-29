@@ -187,6 +187,50 @@ export function getDroolLevel(droolIndex: number): DroolLevelInfo {
 export class SycophancyDetector {
   private entries: LexiconEntry[] = [];
 
+  /**
+   * Locate the shipped lexicon file relative to *this module*.
+   *
+   * Must not use `__dirname`: the bundler replaces it with the build machine's
+   * absolute source path, which then ships inside the published tarball and
+   * resolves to a nonexistent directory on every other host. `import.meta.url`
+   * survives bundling and points at the real installed location.
+   */
+  private static readShippedLexicon(): string | undefined {
+    const candidates: string[] = [];
+    try {
+      const { fileURLToPath } = require('node:url');
+      const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+
+      // Layouts to cover: src/ (dev, via ts runner), dist/ (built bundle),
+      // and the unpacked tarball where data/ sits beside dist/.
+      candidates.push(
+        path.resolve(moduleDir, '../data/sycophancy_lexicon.txt'),
+        path.resolve(moduleDir, 'data/sycophancy_lexicon.txt'),
+      );
+    } catch {
+      // import.meta.url unavailable (non-ESM host); fall through to __dirname
+    }
+
+    // Last resort for CommonJS hosts where the bundler kept __dirname intact.
+    if (typeof __dirname === 'string' && path.isAbsolute(__dirname)) {
+      candidates.push(
+        path.resolve(__dirname, '../data/sycophancy_lexicon.txt'),
+        path.resolve(__dirname, 'data/sycophancy_lexicon.txt'),
+      );
+    }
+
+    for (const candidate of candidates) {
+      try {
+        if (fs.existsSync(candidate)) {
+          return fs.readFileSync(candidate, 'utf8');
+        }
+      } catch {
+        // Try the next candidate
+      }
+    }
+    return undefined;
+  }
+
   constructor(customLexiconText?: string) {
     this.init(customLexiconText);
   }
@@ -194,15 +238,7 @@ export class SycophancyDetector {
   private init(customText?: string) {
     let raw = customText;
     if (!raw) {
-      // Try to read from data/sycophancy_lexicon.txt if available
-      try {
-        const localPath = path.resolve(__dirname, '../data/sycophancy_lexicon.txt');
-        if (fs.existsSync(localPath)) {
-          raw = fs.readFileSync(localPath, 'utf8');
-        }
-      } catch {
-        // Fall back to embedded
-      }
+      raw = SycophancyDetector.readShippedLexicon();
     }
     if (!raw) {
       raw = DEFAULT_LEXICON_RAW;
