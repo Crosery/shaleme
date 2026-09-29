@@ -267,7 +267,7 @@ export SHALEME_LEADERBOARD_URL=https://your-leaderboard.example.com/submit
 选项:
   --no-open          分析完成后不自动在浏览器中打开 HTML 报告
   --out <path>       自定义生成的 HTML 报告路径 (默认生成在 ~/Downloads/)
-  --json             仅输出纯 JSON 统计数据（适合脚本或管道自动化）
+  --json             仅输出纯 JSON 统计数据（适合脚本或管道）
   --harness <names>  限定分析特定的 Agent Harness (逗号分隔，如 claude,codex,omp,pi)
   --jobs <n>         并行扫描的工作线程数 (默认: CPU 核数 - 1，上限 8)
   --no-parallel      禁用并行扫描，单线程运行 (等同于 --jobs 1)
