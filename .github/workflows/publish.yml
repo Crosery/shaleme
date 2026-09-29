@@ -1,33 +1,40 @@
 name: Publish to npm
 
+# Tag-driven release: `git tag v0.1.2 && git push origin v0.1.2` publishes.
+# Publishing uses npm trusted publishing (OIDC) instead of a long-lived
+# NPM_TOKEN secret: the run exchanges a short-lived id-token for a
+# publish-only credential, so there is no repo secret to leak or rotate.
+# One-time setup on npmjs.com: package → Settings → Trusted publishing →
+# GitHub Actions, with Organization or user `Crosery`, Repository `shaleme`,
+# Workflow filename `publish.yml`.
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
+
+permissions:
+  id-token: write # required for OIDC (trusted publishing + provenance)
+  contents: read
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Build bundle
-        run: |
-          bun run build
+        run: bun run build
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false # never cache in release builds
 
       - name: Publish to npm
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
