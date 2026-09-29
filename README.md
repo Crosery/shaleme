@@ -102,6 +102,35 @@ npx shaleme
 bunx shaleme
 ```
 
+> **暂时建议从 GitHub 直接运行**（见下方「关于 npm 版本」）：
+>
+> ```bash
+> npx github:Crosery/shaleme
+> bunx github:Crosery/shaleme
+> ```
+
+### 关于 npm 版本
+
+registry 上当前是 **0.1.0**，它有一个已知崩溃缺陷：当命中包含 `**` 等正则元字符的
+短语时（例如 `你说一句 **continue** 我就`），生成 HTML 报告会抛
+`SyntaxError: Invalid regular expression ... Nothing to repeat`，整份报告无法产出。
+
+修复已在仓库里（`main`，v0.1.2），但**尚未发布到 registry**，因此在那之前请用
+GitHub 渠道安装，它自带已修复的构建产物：
+
+```bash
+npx github:Crosery/shaleme
+```
+
+0.1.2 相对 0.1.0 的差异：
+
+| | 0.1.0（registry） | 0.1.2（仓库） |
+| :--- | :--- | :--- |
+| 含正则元字符的短语 | **崩溃，出不了报告** | 正常 |
+| 扫描耗时（本机 2,256 个会话文件） | ~19s | ~4s（多核并行） |
+| 会话数统计 | 少算（并行路径未计入） | 正确 |
+| 榜单排名顺序 | 可能随运行变化 | 确定 |
+
 ### 2. 全局安装：
 
 ```bash
