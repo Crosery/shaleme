@@ -40,6 +40,8 @@ ${c.bold('选项:')}
   --out <path>       自定义生成的 HTML 报告路径 (默认生成在 ~/Downloads/)
   --json             仅输出纯 JSON 统计数据（适合脚本或管道）
   --harness <names>  限定分析特定的 Agent Harness (逗号分隔，如 claude,codex,omp,pi)
+  --jobs <n>         并行扫描的工作线程数 (默认: CPU 核数 - 1，上限 8)
+  --no-parallel      禁用并行扫描，单线程运行 (等同于 --jobs 1)
   --help, -h         显示帮助信息
   --version, -v      显示版本号
 
@@ -77,6 +79,14 @@ ${c.bold('支持的 Agent 平台:')}
   if (harnessIdx !== -1 && args[harnessIdx + 1]) {
     selectedHarnesses = args[harnessIdx + 1].split(',').map((s) => s.trim().toLowerCase()) as HarnessId[];
   }
+
+  let jobs: number | undefined;
+  const jobsIdx = args.indexOf('--jobs');
+  if (jobsIdx !== -1 && args[jobsIdx + 1]) {
+    const parsed = Number(args[jobsIdx + 1]);
+    if (Number.isFinite(parsed) && parsed >= 1) jobs = Math.floor(parsed);
+  }
+  if (args.includes('--no-parallel')) jobs = 1;
 
   if (!isJson) {
     printBanner();
@@ -116,6 +126,7 @@ ${c.bold('支持的 Agent 平台:')}
   const summary = await runUnifiedScan(
     {
       harnesses: selectedHarnesses,
+      jobs,
       onHarnessStart: (h, name) => {
         if (!isJson) {
           progressBar.start(name);

@@ -90,3 +90,84 @@ parses these small flat objects very quickly and the gate runs on **every** line
 Reverted. Kept here so the next person does not re-attempt it on the same theory.
 The honest lever for real speedup is I/O concurrency (reading session files in
 parallel), not cheaper matching or cheaper parsing.
+
+## io-concurrency.ts
+
+Answers: **where does the 94% "I/O + parse" go, and does concurrency buy it back?**
+
+Run: `bun run spikes/io-concurrency.ts`
+
+### Result (2,256 files, 8 GB real corpus; one variant per process for RSS)
+
+| variant | time | peak RSS |
+|---|---|---|
+| A. readline stream, serial (ships today) | 13.5 s | 878 MB |
+| B. readFile + split, serial | 10.9 s | **5,350 MB** |
+| C. readFile + split, conc=8 | **6.6 s** | **6,483 MB** |
+| D. readline stream, conc=16 | 11.4 s | 5,296 MB |
+| E. hybrid small/large, conc=16 | 11.4 s | 1,693 MB |
+| F. chunked, conc=32 | 8.2 s | 1,679 MB |
+
+Note C/D "conc=16" numbers are cross-contaminated: Bun does not return freed
+memory to the OS, so RSS accumulates across variants in one process. Trust the
+one-variant-per-process runs (A, B, C8) for memory.
+
+### Conclusions
+
+- **`readline` is the bottleneck, not `readFile`**: B beats A by 24% at equal
+  concurrency. `readline`'s per-line event plumbing dominates on large logs.
+- **`readFile` is disqualified by memory**: 24 session files exceed 50 MB and
+  two exceed 200 MB (largest 350 MB). Buffering them whole peaks at 5-6 GB.
+- **Concurrency alone does not fix readline** (D ≈ A): on Bun, async iteration
+  over `readline` does not overlap usefully.
+- Chunked reading gets readFile-class throughput inside a fixed memory ceiling,
+  which is the only combination that satisfies both constraints.
+
+### But it is not worth shipping on its own
+
+The chunked reader was then implemented for real (`forEachJsonLine`, splitting
+on **bytes** so UTF-8 sequences straddling a chunk boundary are never decoded
+mid-character) and differentially verified byte-identical against the old
+reader over 460 files / 401,097 records including all 8 largest.
+
+Interleaved A/B on the real CLI (4 rounds, alternating builds to cancel machine
+drift) — OLD median 20.72 s vs NEW median 20.11 s: **~3%**, not the 1.6× the
+micro-benchmark implied. Under Node it also *raised* resident memory
+(0.66 GB → 1.3 GB), because splitting a whole 1 MB chunk creates thousands of
+live substrings at once where `readline` held one line at a time.
+
+~3% does not justify 100 lines of UTF-8 chunk-boundary subtlety in the hot path
+of every adapter, so it was reverted. The micro-benchmark measured the wrong
+thing: it timed tight loops over already-hot pages, not the real scan.
+
+## worker-scaling.ts
+
+Answers: **is the scan CPU-bound, and does worker_threads parallelism scale?**
+
+Run: `bun run spikes/worker-scaling.ts`
+
+### Result (same 8 GB corpus, 14 cores)
+
+```
+serial            10304 ms
+workers=2          5905 ms   1.75x
+workers=4          3409 ms   3.02x
+workers=6          2497 ms   4.13x
+workers=8          2195 ms   4.69x
+workers=14         1875 ms   5.50x
+```
+
+(`MISMATCH` on line counts is live sessions being appended to during the run:
+the drift is a few lines out of 1,205,521, and `assistant` counts are equal.)
+
+### Conclusion: this is the lever
+
+Node reports `user ≈ real` for the scan, and the reader swap above proves the
+work is not I/O-scheduler-bound, so the scan is **CPU-bound on one thread** —
+UTF-8 decode plus `JSON.parse` over 1.2 M JSONL records. Parallelism scales
+near-linearly to 5.5× and is the only change that materially answers "it's slow".
+
+Caveat to carry into the real implementation: the spike parses only. The real
+scan also runs detection and holds per-model aggregation state, and peak memory
+becomes `workers × per-worker working set`, so the worker count needs a cap.
+

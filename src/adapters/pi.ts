@@ -1,7 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ExtractedMessage, HarnessId } from '../types';
-import { BaseAdapter, findFilesRecursively, forEachJsonLine, getHomeDir } from './base';
+import {
+  AdapterWork,
+  BaseAdapter,
+  findFilesRecursively,
+  forEachJsonLine,
+  getHomeDir,
+} from './base';
 
 export class PiAdapter extends BaseAdapter {
   readonly id: HarnessId = 'pi';
@@ -22,7 +28,7 @@ export class PiAdapter extends BaseAdapter {
     );
   }
 
-  async *collectMessages(onProgress?: (count: number) => void): AsyncIterable<ExtractedMessage> {
+  private listFiles(): string[] {
     const piDir = this.getPiDir();
     const files: string[] = [];
 
@@ -36,95 +42,118 @@ export class PiAdapter extends BaseAdapter {
       files.push(...findFilesRecursively(generalSessions, (_, name) => name.endsWith('.jsonl'), 4));
     }
 
-    let count = 0;
-    // 1. Process JSONL session files
-    for (const file of files) {
-      const sessionId = path.basename(file, '.jsonl');
-      let currentModel = 'pi-model';
-      const messagesInFile: ExtractedMessage[] = [];
-
-      await forEachJsonLine(file, (data) => {
-        if (data.type === 'model_change' && (data.modelId || data.model)) {
-          currentModel = data.modelId || data.model;
-        }
-
-        if (data.type !== 'message' || !data.message) {
-          return;
-        }
-
-        const msg = data.message;
-        if (msg.role !== 'assistant') {
-          return;
-        }
-
-        const model = msg.model || msg.modelId || currentModel;
-        const rawTime = msg.timestamp || data.timestamp;
-        const timestamp = typeof rawTime === 'number' ? rawTime : (rawTime ? new Date(rawTime).getTime() : Date.now());
-
-        let text = '';
-        const content = msg.content;
-
-        if (typeof content === 'string') {
-          text = content;
-        } else if (Array.isArray(content)) {
-          for (const block of content) {
-            if (typeof block === 'string') {
-              text += block + ' ';
-            } else if (block && typeof block === 'object') {
-              if (block.type === 'text' && typeof block.text === 'string') {
-                text += block.text + ' ';
-              }
-            }
-          }
-        }
-
-        text = text.trim();
-        if (text) {
-          count++;
-          if (onProgress && count % 20 === 0) onProgress(count);
-          messagesInFile.push({
-            harness: this.id,
-            sessionId,
-            timestamp,
-            model,
-            text,
-          });
-        }
-      });
-
-      for (const m of messagesInFile) {
-        yield m;
-      }
-    }
-
-    // 2. Process workflow runs
     const runsDir = path.join(piDir, 'workflows');
     if (fs.existsSync(runsDir)) {
-      const runFiles = findFilesRecursively(runsDir, (_, name) => name.endsWith('.json') && !name.endsWith('.bak'), 5);
-      for (const runFile of runFiles) {
-        try {
-          const content = fs.readFileSync(runFile, 'utf8');
-          const data = JSON.parse(content);
-          const runId = data.runId || path.basename(runFile, '.json');
-          const journal = data.journal;
+      files.push(
+        ...findFilesRecursively(
+          runsDir,
+          (_, name) => name.endsWith('.json') && !name.endsWith('.bak'),
+          5,
+        ),
+      );
+    }
 
-          if (Array.isArray(journal)) {
-            for (const entry of journal) {
-              if (entry && typeof entry.result === 'string') {
-                count++;
-                yield {
-                  harness: this.id,
-                  sessionId: runId,
-                  timestamp: Date.now(),
-                  model: 'pi-workflow-agent',
-                  text: entry.result,
-                };
-              }
+    return files;
+  }
+
+  async listWork(): Promise<AdapterWork> {
+    return { harness: this.id, files: this.listFiles() };
+  }
+
+  /** Parse one file, dispatching on kind: workflow run JSON vs session JSONL. */
+  async parseFile(file: string): Promise<ExtractedMessage[]> {
+    return file.endsWith('.json') ? this.parseWorkflowRun(file) : this.parseSession(file);
+  }
+
+  private parseWorkflowRun(runFile: string): ExtractedMessage[] {
+    const out: ExtractedMessage[] = [];
+    try {
+      const data = JSON.parse(fs.readFileSync(runFile, 'utf8'));
+      const runId = data.runId || path.basename(runFile, '.json');
+      const journal = data.journal;
+
+      if (Array.isArray(journal)) {
+        for (const entry of journal) {
+          if (entry && typeof entry.result === 'string') {
+            out.push({
+              harness: this.id,
+              sessionId: runId,
+              timestamp: Date.now(),
+              model: 'pi-workflow-agent',
+              text: entry.result,
+            });
+          }
+        }
+      }
+    } catch {
+      // Ignore parse errors on individual workflow files
+    }
+    return out;
+  }
+
+  private async parseSession(file: string): Promise<ExtractedMessage[]> {
+    const sessionId = path.basename(file, '.jsonl');
+    const messagesInFile: ExtractedMessage[] = [];
+    let currentModel = 'pi-model';
+
+    await forEachJsonLine(file, (data) => {
+      if (data.type === 'model_change' && (data.modelId || data.model)) {
+        currentModel = data.modelId || data.model;
+      }
+
+      if (data.type !== 'message' || !data.message) {
+        return;
+      }
+
+      const msg = data.message;
+      if (msg.role !== 'assistant') {
+        return;
+      }
+
+      const model = msg.model || msg.modelId || currentModel;
+      const rawTime = msg.timestamp || data.timestamp;
+      const timestamp =
+        typeof rawTime === 'number' ? rawTime : rawTime ? new Date(rawTime).getTime() : Date.now();
+
+      let text = '';
+      const content = msg.content;
+
+      if (typeof content === 'string') {
+        text = content;
+      } else if (Array.isArray(content)) {
+        for (const block of content) {
+          if (typeof block === 'string') {
+            text += block + ' ';
+          } else if (block && typeof block === 'object') {
+            if (block.type === 'text' && typeof block.text === 'string') {
+              text += block.text + ' ';
             }
           }
-        } catch {
-          // Ignore parse errors on individual workflow files
         }
+      }
+
+      text = text.trim();
+      if (text) {
+        messagesInFile.push({
+          harness: this.id,
+          sessionId,
+          timestamp,
+          model,
+          text,
+        });
+      }
+    });
+
+    return messagesInFile;
+  }
+
+  async *collectMessages(onProgress?: (count: number) => void): AsyncIterable<ExtractedMessage> {
+    let count = 0;
+    for (const file of this.listFiles()) {
+      for (const m of await this.parseFile(file)) {
+        count++;
+        if (onProgress && count % 20 === 0) onProgress(count);
+        yield m;
       }
     }
   }

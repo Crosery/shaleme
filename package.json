@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build src/cli.ts --outfile dist/cli.js --target node && bun build src/index.ts --outfile dist/index.js --target node",
+    "build": "bun build src/cli.ts --outfile dist/cli.js --target node && bun build src/index.ts --outfile dist/index.js --target node && bun build src/scan/worker.ts --outfile dist/worker.js --target node",
     "start": "node bin/shaleme.js",
     "test": "bun test tests/"
   },

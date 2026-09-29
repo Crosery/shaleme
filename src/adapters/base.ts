@@ -109,6 +109,20 @@ export async function forEachJsonLine(
   }
 }
 
+/**
+ * A unit of work an adapter can hand to the parallel scan.
+ *
+ * `files` are parsed by `parseFile`, independently of each other, so they can be
+ * spread across worker threads. `context` carries whatever per-adapter state the
+ * parse needs (e.g. codex's threadId -> model map) and must survive
+ * `structuredClone`, since it crosses a thread boundary.
+ */
+export interface AdapterWork {
+  harness: HarnessId;
+  files: string[];
+  context?: unknown;
+}
+
 export abstract class BaseAdapter {
   abstract readonly id: HarnessId;
   abstract readonly name: string;
@@ -117,4 +131,23 @@ export abstract class BaseAdapter {
 
   abstract check(): Promise<boolean>;
   abstract collectMessages(onProgress?: (count: number) => void): AsyncIterable<ExtractedMessage>;
+
+  /**
+   * Optional: enumerate files independent of each other.
+   *
+   * Adapters that implement this (together with `parseFile`) are scanned in
+   * parallel. Adapters that do not fall back to the serial `collectMessages`
+   * path, so adding the fast path is opt-in and cannot regress the others.
+   */
+  listWork?(): Promise<AdapterWork>;
+
+  /**
+   * Optional: parse one file into messages. Must depend only on the file and
+   * `context`, because workers run many of these concurrently and any hidden
+   * shared state would corrupt results non-deterministically.
+   *
+   * Files are not always scannable even when listed (a task can be deleted
+   * between enumeration and parse), so returning an empty array is normal.
+   */
+  parseFile?(file: string, context: any): Promise<ExtractedMessage[]>;
 }
