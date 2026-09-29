@@ -121,7 +121,25 @@ npx shaleme --json
 
 # 指定仅分析 Claude Code 和 Codex
 npx shaleme --harness claude,codex
+
+# 指定并行工作线程数（默认 CPU 核数 - 1，上限 8）
+npx shaleme --jobs 8
+
+# 禁用并行，单线程运行（结果相同，用于排查问题）
+npx shaleme --no-parallel
 ```
+
+### 4. 性能说明：
+
+扫描是 **CPU 密集型**（UTF-8 解码 + JSON 解析占了 94% 的时间，正则匹配只占 5.7%），
+所以提速靠的是多核并行。在本机约 8GB / 2,256 个会话文件的真实语料上实测：
+
+| `--jobs` | 1 | 2 | 4 | 8 |
+| :--- | ---: | ---: | ---: | ---: |
+| 耗时 | 18.7s | 10.1s | 6.1s | **4.0s** |
+
+默认上限设为 8：再往上收益趋平，而并行会成倍放大内存占用。
+`--jobs 1` 与默认配置产出的报告**完全一致**，并行只影响速度，不影响结果。
 
 ---
 
@@ -219,6 +237,25 @@ TOP 5 附和榜首模型:
 3. **历史时间线走势图 (SVG Area Line)**：回溯哪一天你让 AI 认怂最多；
 4. **真实名场面卡片 (Case Citations)**：截取模型被反驳后光速认错的原话名场面。
 
+### 成绩导出与榜单提交
+
+报告底部提供两个按钮：
+
+- **导出成绩 JSON**：把本次统计导出成 `shaleme-score.json`，可手动上传到任何榜单；
+- **上传到榜单**：POST 到指定榜单地址（未配置时按钮会提示先导出）。
+
+**隐私边界**：分析全程在本机完成。提交载荷**只含汇总计数**（模型名、命中次数、
+消息条数、MDI、会话数），**不含任何对话正文、引用片段、会话 ID 或文件路径**。
+测试里有断言卡住这一点，防止将来被顺手改宽。
+
+配置榜单地址：
+
+```bash
+npx shaleme --leaderboard https://your-leaderboard.example.com/submit
+# 或
+export SHALEME_LEADERBOARD_URL=https://your-leaderboard.example.com/submit
+```
+
 ---
 
 ## CLI 参数选项
@@ -232,6 +269,9 @@ TOP 5 附和榜首模型:
   --out <path>       自定义生成的 HTML 报告路径 (默认生成在 ~/Downloads/)
   --json             仅输出纯 JSON 统计数据（适合脚本或管道自动化）
   --harness <names>  限定分析特定的 Agent Harness (逗号分隔，如 claude,codex,omp,pi)
+  --jobs <n>         并行扫描的工作线程数 (默认: CPU 核数 - 1，上限 8)
+  --no-parallel      禁用并行扫描，单线程运行 (等同于 --jobs 1)
+  --leaderboard <url> 报告页「上传到榜单」的提交地址 (默认读 SHALEME_LEADERBOARD_URL)
   --help, -h         显示帮助信息
   --version, -v      显示版本号
 ```
@@ -251,6 +291,7 @@ shaleme/
 │   ├── types.ts              # 统一数据结构与接口类型
 │   ├── adapters/             # 各大 Agent Harness 数据适配器
 │   │   ├── base.ts           # 跨平台文件流处理与统一 SQLite 读取抽象
+│   │   ├── registry.ts       # 适配器注册表（worker 线程按 id 构造适配器）
 │   │   ├── claude.ts         # Claude Code 适配器
 │   │   ├── codex.ts          # Codex 适配器
 │   │   ├── omp.ts            # OMP 适配器
@@ -261,6 +302,13 @@ shaleme/
 │   │   ├── openclaw.ts       # OpenClaw 适配器
 │   │   ├── cursor.ts         # Cursor 适配器
 │   │   └── opencode.ts       # OpenCode 适配器
+│   ├── scan/                 # 并行扫描流水线
+│   │   ├── aggregate.ts      # 消息→统计聚合（串行/并行共用同一实现）
+│   │   ├── plan.ts           # 统计→报告（含确定性排序，保证排名不随线程数变化）
+│   │   ├── parallel.ts       # 按文件切片、调度 worker、合并结果
+│   │   └── worker.ts         # worker 线程入口（只回传聚合值，不回传原始消息）
+│   ├── share/
+│   │   └── payload.ts        # 榜单提交载荷构造（只含计数，不含对话内容）
 │   ├── report/
 │   │   ├── generator.ts      # 纯内联 Standalone HTML 报告渲染器
 │   │   └── open.ts           # 跨平台浏览器唤起工具
@@ -269,6 +317,13 @@ shaleme/
 │       └── text.ts           # 模型名归一化与文本截取辅助
 ├── data/
 │   └── sycophancy_lexicon.txt # 谄媚短语与盲从句式词典库
+├── spikes/                   # 一次性实验与实测结论（不进 npm 包）
+│   ├── README.md             # 各项实测数据与被否决方案的记录
+│   ├── regex-vs-cosine.ts    # 正则 vs 余弦相似度
+│   ├── profile-scan.ts       # 扫描耗时归因
+│   ├── prefilter-parse.ts    # JSON.parse 前置过滤
+│   ├── io-concurrency.ts     # 读取方式与并发对比
+│   └── worker-scaling.ts     # worker 并行扩展性
 └── tests/                    # 单元测试集
 ```
 
