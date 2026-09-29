@@ -1,0 +1,22 @@
+{
+  "name": "shaleme-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "shaleme 榜单：在 Cloudflare Workers + D1 上托管「你说得对」命中次数与 MDI 排名",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply shaleme-leaderboard --local",
+    "db:migrate:remote": "wrangler d1 migrations apply shaleme-leaderboard --remote"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^13.7.0",
+    "astro": "^6.4.8"
+  },
+  "devDependencies": {
+    "wrangler": "^4.143.0"
+  }
+}

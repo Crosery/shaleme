@@ -1,0 +1,117 @@
+---
+type Props = {
+  state: string;
+  rank: number;
+};
+
+const { state, rank } = Astro.props;
+
+const messages: Record<string, { tone: 'ok' | 'warn' | 'info'; title: string; body: string }> = {
+  'submitted': {
+    tone: 'ok',
+    title: rank > 0 ? `成绩已上榜，当前第 ${rank} 名` : '成绩已上榜',
+    body: '要更新成绩，在本机重新跑一次报告再点「上传到榜单」即可，同一个人只保留最新一次。',
+  },
+  'signed-in': {
+    tone: 'info',
+    title: '已登录 GitHub',
+    body: '现在可以在报告页点「上传到榜单」直接提交，或者去自己的主页看看已有的明细。',
+  },
+  'signed-out': {
+    tone: 'info',
+    title: '已退出登录',
+    body: '退出只影响这台浏览器上的会话，榜单数据不受影响。',
+  },
+  'oauth-denied': {
+    tone: 'warn',
+    title: '授权被拒绝或已过期',
+    body: 'GitHub 授权回调缺少有效的 state，通常是页面停留太久或换了浏览器。重新点一次登录即可。',
+  },
+  'oauth-failed': {
+    tone: 'warn',
+    title: 'GitHub 授权失败',
+    body: '换取 access token 或读取用户信息时出错。检查 GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET 是否与 OAuth App 一致。',
+  },
+  'auth-misconfigured': {
+    tone: 'warn',
+    title: '登录未配置',
+    body: '部署环境缺少 GITHUB_CLIENT_ID、GITHUB_CLIENT_SECRET 或 SESSION_SECRET，见 web/README.md。',
+  },
+  'not-configured': {
+    tone: 'warn',
+    title: '榜单还没接上数据库',
+    body: 'Worker 没有绑定 D1 的 DB。创建数据库、写入 database_id、应用迁移之后再试。',
+  },
+  'invalid-payload': {
+    tone: 'warn',
+    title: '提交内容无法解析',
+    body: '请求里没有 payload 字段，或者它不是合法的 JSON。请从报告页的「上传到榜单」按钮提交，不要手工构造。',
+  },
+  'submit-requires-form': {
+    tone: 'info',
+    title: '这个地址只接受报告页的提交',
+    body: '直接打开 /submit 不会提交任何东西。请在本机跑 shaleme，用报告页的「上传到榜单」按钮。',
+  },
+};
+
+const message = messages[state] ?? null;
+---
+
+{
+  message && (
+    <div class="banner" data-state-banner data-tone={message.tone}>
+      <div class="banner-title">{message.title}</div>
+      <p class="banner-body">{message.body}</p>
+    </div>
+  )
+}
+
+<script>
+  // 提示只在这一次跳转里有用，清掉查询参数避免刷新后重复出现。
+  const banner = document.querySelector('[data-state-banner]');
+
+  if (banner) {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete('state');
+    nextUrl.searchParams.delete('rank');
+    window.history.replaceState({}, '', nextUrl);
+  }
+</script>
+
+<style>
+  .banner {
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+
+  .banner[data-tone='ok'] {
+    border-left-color: var(--emerald);
+    background: rgba(5, 150, 105, 0.05);
+  }
+
+  .banner[data-tone='warn'] {
+    border-left-color: var(--amber);
+    background: rgba(217, 119, 6, 0.05);
+  }
+
+  .banner[data-tone='info'] {
+    border-left-color: var(--primary);
+    background: var(--primary-soft);
+  }
+
+  .banner-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .banner-body {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+</style>

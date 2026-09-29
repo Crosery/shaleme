@@ -1,0 +1,146 @@
+---
+type Props = {
+  title: string;
+  description: string;
+  lang?: string;
+};
+
+const { title, description, lang = 'zh-CN' } = Astro.props;
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <slot name="head" />
+    <style is:global>
+      :root {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --bg-subtle: #f1f5f9;
+        --surface: #ffffff;
+        --border: #e2e8f0;
+        --border-strong: #cbd5e1;
+        --text: #0f172a;
+        --text-secondary: #475569;
+        --muted: #64748b;
+        --primary: #4f46e5;
+        --primary-soft: #eef2ff;
+        --amber: #d97706;
+        --emerald: #059669;
+        --rose: #e11d48;
+        --radius: 10px;
+        --radius-sm: 6px;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.05);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
+          'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      .page {
+        min-height: 100vh;
+        padding: 32px 20px 80px;
+      }
+
+      .shell {
+        max-width: 1140px;
+        margin: 0 auto;
+      }
+
+      .surface {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+
+      .section-title {
+        margin: 0 0 4px;
+        font-size: 18px;
+        line-height: 1.2;
+        font-weight: 700;
+      }
+
+      .section-copy {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .numeric {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .missing-shell {
+        min-height: 60vh;
+        display: grid;
+        place-items: center;
+      }
+
+      .missing-card {
+        width: min(520px, 100%);
+        padding: 24px;
+      }
+
+      .missing-copy {
+        color: var(--muted);
+        margin: 8px 0 18px;
+      }
+
+      .missing-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 0 16px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-strong);
+        background: var(--bg-subtle);
+        color: inherit;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          padding: 20px 14px 60px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <slot />
+    </div>
+  </body>
+</html>

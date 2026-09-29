@@ -1,0 +1,102 @@
+---
+import LeaderboardTable from './LeaderboardTable.astro';
+import MetricExplainer from './MetricExplainer.astro';
+import Podium from './Podium.astro';
+import SiteHeader from './SiteHeader.astro';
+import StatsStrip from './StatsStrip.astro';
+import StatusBanner from './StatusBanner.astro';
+import type { LeaderboardEntry, LeaderboardSummary, Viewer } from '../lib/types';
+
+type Props = {
+  entries: LeaderboardEntry[];
+  summary: LeaderboardSummary;
+  viewer: Viewer | null;
+  state: string;
+  rank: number;
+  databaseReady: boolean;
+};
+
+const { entries, summary, viewer, state, rank, databaseReady } = Astro.props;
+
+const top = entries.slice(0, 3);
+
+const stats = [
+  {
+    label: '参与人数',
+    value: summary.participants.toLocaleString('en-US'),
+    hint: '按 GitHub 账号去重',
+    tone: 'indigo' as const,
+  },
+  {
+    label: '累计命中',
+    value: summary.totalDrool.toLocaleString('en-US'),
+    hint: '所有提交的「你说得对」次数之和',
+    tone: 'rose' as const,
+  },
+  {
+    label: '累计 assistant 消息',
+    value: summary.totalAssistantMessages.toLocaleString('en-US'),
+    hint: 'MDI 的分母',
+    tone: 'emerald' as const,
+  },
+  {
+    label: '平均 MDI',
+    value: summary.averageMdi.toFixed(2),
+    hint: '每千条 assistant 消息的命中次数',
+    tone: 'amber' as const,
+  },
+];
+---
+
+<main class="shell">
+  <SiteHeader
+    title="shaleme 榜单"
+    subtitle="谁家的模型最爱说「你说得对」"
+    viewer={viewer}
+    active="leaderboard"
+  />
+
+  <StatusBanner state={state} rank={rank} />
+
+  {
+    !databaseReady ? (
+      <div class="setup-notice surface">
+        <h2 class="section-title">榜单还没接上数据库</h2>
+        <p class="setup-copy">
+          Worker 缺少 D1 的 <span class="numeric">DB</span> 绑定，页面先把空榜渲染出来了。
+          按 <span class="numeric">web/README.md</span> 里的「创建 D1 数据库」和「应用迁移」两步补齐即可。
+        </p>
+      </div>
+    ) : (
+      <>
+        <StatsStrip items={stats} />
+        <MetricExplainer
+          leftLabel="流口水指数 MDI"
+          leftValue="命中次数 / assistant 消息数 × 1000"
+          leftHint="每千条回复里的附和次数"
+          rightLabel="分档阈值"
+          rightValue="2 / 10 / 25 / 50"
+          rightHint="与 CLI 报告一致的档位边界"
+          markdown="MDI = drool_count / assistant_messages * 1000"
+        />
+        {top.length > 0 && <Podium items={top} />}
+      </>
+    )
+  }
+
+  <LeaderboardTable entries={entries} />
+</main>
+
+<style>
+  .setup-notice {
+    padding: 18px;
+    margin-bottom: 16px;
+    border-left: 3px solid var(--amber);
+  }
+
+  .setup-copy {
+    margin: 8px 0 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+</style>

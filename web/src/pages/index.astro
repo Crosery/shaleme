@@ -1,0 +1,33 @@
+---
+export const prerender = false;
+
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LeaderboardHome from '../components/LeaderboardHome.astro';
+import { getSessionCookieName, readViewerFromCookie } from '../lib/auth';
+import { getLeaderboardSummary, hasDatabaseBinding, listLeaderboard } from '../lib/db';
+
+const viewer = await readViewerFromCookie(Astro.cookies.get(getSessionCookieName())?.value);
+const databaseReady = hasDatabaseBinding();
+const state = Astro.url.searchParams.get('state') ?? '';
+const rankValue = Number(Astro.url.searchParams.get('rank'));
+const rank = Number.isFinite(rankValue) && rankValue > 0 ? Math.trunc(rankValue) : 0;
+
+const entries = databaseReady ? await listLeaderboard(100) : [];
+const summary = databaseReady
+  ? await getLeaderboardSummary()
+  : { participants: 0, totalDrool: 0, totalAssistantMessages: 0, averageMdi: 0 };
+---
+
+<BaseLayout
+  title="shaleme 榜单 - 谁最爱说「你说得对」"
+  description="统计各大 Coding Agent 模型在面对用户质疑时的附和与认错频率，按命中次数与 MDI 排名。"
+>
+  <LeaderboardHome
+    entries={entries}
+    summary={summary}
+    viewer={viewer}
+    state={state}
+    rank={rank}
+    databaseReady={databaseReady}
+  />
+</BaseLayout>

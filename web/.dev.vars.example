@@ -1,0 +1,20 @@
+# 本地开发用的变量文件。复制成 `.dev.vars` 后填入真实值，`.dev.vars` 已被 .gitignore 忽略。
+#
+# 线上不要用这个文件：线上用 `wrangler secret put <NAME>` 写入加密变量，
+# 只有 APP_URL 走 wrangler.jsonc 的 vars（它不是密钥）。
+
+# 站点对外根地址，用于拼 GitHub OAuth 的 redirect_uri。
+# 本地开发固定为 astro dev 的地址；留空则回退成「当前请求的 origin」。
+APP_URL=http://127.0.0.1:4321
+
+# GitHub OAuth App 的 Client ID。
+# 获取位置：GitHub -> Settings -> Developer settings -> OAuth Apps -> 你的 App -> Client ID。
+# 创建步骤见 web/README.md「创建 GitHub OAuth App」。
+GITHUB_CLIENT_ID=replace-with-your-github-oauth-client-id
+
+# GitHub OAuth App 的 Client secret。同上页面点 Generate a new client secret。
+GITHUB_CLIENT_SECRET=replace-with-your-github-oauth-client-secret
+
+# 会话 cookie 的 HMAC-SHA256 签名密钥。任意长随机串，例如 `openssl rand -base64 48`。
+# 换掉它会让所有已登录会话立即失效。
+SESSION_SECRET=replace-with-a-long-random-string

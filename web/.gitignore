@@ -1,0 +1,7 @@
+# 本地密钥文件，绝不入库。
+.dev.vars
+
+node_modules/
+dist/
+.astro/
+.wrangler/

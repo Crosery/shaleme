@@ -1,0 +1,431 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import StatusBanner from '../../components/StatusBanner.astro';
+import { getMdiTier } from '../../lib/report';
+import { getSessionCookieName, readViewerFromCookie } from '../../lib/auth';
+import { getLeaderboardProfileByLogin, hasDatabaseBinding } from '../../lib/db';
+
+const login = Astro.params.login ?? '';
+const viewer = await readViewerFromCookie(Astro.cookies.get(getSessionCookieName())?.value);
+const databaseReady = hasDatabaseBinding();
+const profile = databaseReady && login ? await getLeaderboardProfileByLogin(login) : null;
+const state = Astro.url.searchParams.get('state') ?? '';
+const rankValue = Number(Astro.url.searchParams.get('rank'));
+const rank = Number.isFinite(rankValue) && rankValue > 0 ? Math.trunc(rankValue) : 0;
+
+if (!profile) {
+  Astro.response.status = 404;
+}
+
+const tier = profile ? getMdiTier(profile.mdi) : null;
+const modelEntries = profile
+  ? [...profile.report.modelEntries].sort((left, right) => right.mdi - left.mdi)
+  : [];
+const isSelf = Boolean(viewer && profile && viewer.githubId === profile.githubId);
+
+function formatDate(value: number) {
+  if (!value) {
+    return '-';
+  }
+
+  return new Date(value).toISOString().slice(0, 16).replace('T', ' ');
+}
+---
+
+<BaseLayout
+  title={profile ? `${profile.displayName} 的 shaleme 成绩` : '找不到这个用户'}
+  description={
+    profile
+      ? `${profile.displayName} 在 shaleme 榜单排第 ${profile.rank} 名，命中 ${profile.droolCount} 次，MDI ${profile.mdi.toFixed(2)}。`
+      : 'shaleme 榜单用户页'
+  }
+>
+  <main class="shell">
+    <SiteHeader
+      title="shaleme 榜单"
+      subtitle="谁家的模型最爱说「你说得对」"
+      viewer={viewer}
+      active="leaderboard"
+    />
+
+    <StatusBanner state={isSelf ? state : ''} rank={rank} />
+
+    {
+      profile && tier ? (
+        <>
+          <section class="surface profile">
+            <img class="profile-avatar" src={profile.avatarUrl} alt="" width="72" height="72" />
+            <div class="profile-identity">
+              <div class="profile-name">{profile.displayName}</div>
+              <a
+                class="profile-handle"
+                href={profile.profileUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                @{profile.login}
+              </a>
+              <div class="profile-meta">
+                <span
+                  class="profile-tier"
+                  style={`color:${tier.color};border-color:${tier.color}44;background:${tier.color}12;`}
+                >
+                  {tier.badge}
+                </span>
+                <span class="profile-tagline">{tier.tagline}</span>
+              </div>
+            </div>
+            <div class="profile-rank">
+              <div class="profile-rank-label">当前名次</div>
+              <div class="profile-rank-value numeric">#{profile.rank}</div>
+            </div>
+          </section>
+
+          <div class="metric-grid">
+            <div class="metric-card surface">
+              <div class="metric-card-label">"你说得对"命中</div>
+              <div class="metric-card-value numeric">{profile.droolCount.toLocaleString('en-US')}</div>
+              <div class="metric-card-hint">累计命中次数</div>
+            </div>
+            <div class="metric-card surface">
+              <div class="metric-card-label">assistant 消息</div>
+              <div class="metric-card-value numeric">
+                {profile.assistantMessages.toLocaleString('en-US')}
+              </div>
+              <div class="metric-card-hint">MDI 的分母</div>
+            </div>
+            <div class="metric-card surface">
+              <div class="metric-card-label">MDI</div>
+              <div class="metric-card-value numeric">{profile.mdi.toFixed(2)}</div>
+              <div class="metric-card-hint">每千条回复的命中次数</div>
+            </div>
+            <div class="metric-card surface">
+              <div class="metric-card-label">扫描会话</div>
+              <div class="metric-card-value numeric">
+                {profile.sessionsScanned.toLocaleString('en-US')}
+              </div>
+              <div class="metric-card-hint">覆盖 {profile.modelCount} 个模型</div>
+            </div>
+          </div>
+
+          <section class="surface models">
+            <div class="models-head">
+              <div>
+                <h2 class="section-title">模型明细</h2>
+                <p class="section-copy">按 MDI 降序，取自最近一次提交的载荷</p>
+              </div>
+              <span class="models-count numeric">{modelEntries.length} 个模型</span>
+            </div>
+
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="col-rank">名次</th>
+                    <th>模型</th>
+                    <th class="col-number">命中</th>
+                    <th class="col-number">assistant 消息</th>
+                    <th class="col-number">MDI</th>
+                    <th class="col-number">档位</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {
+                    modelEntries.length === 0 ? (
+                      <tr>
+                        <td colspan="6" class="empty-cell">
+                          这次提交里没有模型明细。用较新版本的 shaleme 重新生成报告再提交即可带上。
+                        </td>
+                      </tr>
+                    ) : (
+                      modelEntries.map((entry, index) => {
+                        const entryTier = getMdiTier(entry.mdi);
+
+                        return (
+                          <tr>
+                            <td class="col-rank numeric rank-cell">#{index + 1}</td>
+                            <td class="model-name">{entry.model}</td>
+                            <td class="col-number numeric strong">
+                              {entry.droolCount.toLocaleString('en-US')}
+                            </td>
+                            <td class="col-number numeric muted-cell">
+                              {entry.totalMessages.toLocaleString('en-US')}
+                            </td>
+                            <td class="col-number numeric strong">{entry.mdi.toFixed(2)}</td>
+                            <td class="col-number">
+                              <span
+                                class="mdi-tier"
+                                style={`color:${entryTier.color};border-color:${entryTier.color}44;background:${entryTier.color}12;`}
+                              >
+                                {entryTier.badge}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <p class="footnote">
+            提交于 <span class="numeric">{formatDate(profile.submittedAt)}</span> ·
+            报告生成于 <span class="numeric">{formatDate(profile.generatedAt)}</span> ·
+            CLI 版本 <span class="numeric">{profile.version || '未知'}</span>
+          </p>
+        </>
+      ) : (
+        <div class="missing-shell">
+          <section class="surface missing-card">
+            <h1 class="section-title">找不到这个用户</h1>
+            <p class="missing-copy">
+              {login
+                ? `榜单上还没有 @${login} 的成绩，可能是还没有提交过，或者用户名拼写不同。`
+                : '这个地址缺少用户名。'}
+            </p>
+            <a class="missing-link" href="/">
+              回到总榜
+            </a>
+          </section>
+        </div>
+      )
+    }
+  </main>
+</BaseLayout>
+
+<style>
+  .profile {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 16px;
+  }
+
+  .profile-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius);
+    flex: 0 0 auto;
+  }
+
+  .profile-identity {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .profile-name {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .profile-handle {
+    display: inline-block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 13px;
+    text-decoration: none;
+  }
+
+  .profile-handle:hover,
+  .profile-handle:focus-visible {
+    color: var(--primary);
+  }
+
+  .profile-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+
+  .profile-tier {
+    border: 1px solid;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .profile-tagline {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .profile-rank {
+    text-align: right;
+    flex: 0 0 auto;
+  }
+
+  .profile-rank-label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .profile-rank-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.1;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .metric-card {
+    padding: 14px 16px;
+  }
+
+  .metric-card-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .metric-card-value {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .metric-card-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .models {
+    padding: 18px;
+  }
+
+  .models-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .models-count {
+    font-size: 12px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    background: var(--bg-subtle);
+    border-radius: 999px;
+    padding: 4px 10px;
+  }
+
+  .table-shell {
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+
+  th {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--bg-subtle);
+    position: sticky;
+    top: 0;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .col-rank {
+    width: 68px;
+  }
+
+  .col-number {
+    text-align: right;
+  }
+
+  .rank-cell {
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .model-name {
+    font-weight: 600;
+    white-space: normal;
+  }
+
+  .strong {
+    font-weight: 700;
+  }
+
+  .muted-cell {
+    color: var(--muted);
+  }
+
+  .mdi-tier {
+    display: inline-block;
+    border: 1px solid;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .empty-cell {
+    text-align: center;
+    color: var(--muted);
+    padding: 32px 12px;
+    white-space: normal;
+  }
+
+  .footnote {
+    margin: 14px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  @media (max-width: 900px) {
+    .metric-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 720px) {
+    .profile {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .profile-rank {
+      text-align: left;
+    }
+
+    .metric-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
