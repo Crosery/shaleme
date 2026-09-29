@@ -3,7 +3,7 @@ var __require = /* @__PURE__ */ createRequire(import.meta.url);
 // src/detector.ts
 import fs from "node:fs";
 import path from "node:path";
-var __dirname = "/Users/crosery/work_file/shaleme/src";
+var __dirname = "/private/tmp/shaleme-fix/src";
 var DEFAULT_LEXICON_RAW = `
 你说得对|direct_agree
 你说的对|direct_agree
@@ -1403,7 +1403,7 @@ async function runUnifiedScan(options = {}, detector = new SycophancyDetector) {
   const overallDroolIndex = totalAssistantMessages > 0 ? Number((totalDroolCount / totalAssistantMessages * 1000).toFixed(2)) : 0;
   const overallDroolLevel = getDroolLevel(overallDroolIndex);
   return {
-    version: "0.1.0",
+    version: "0.1.1",
     generatedAt: Date.now(),
     generatedDate: new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }),
     totalDroolCount,
@@ -2596,7 +2596,7 @@ ${c.bold("支持的 Agent 平台:")}
     process.exit(0);
   }
   if (args.includes("--version") || args.includes("-v")) {
-    console.log("shaleme v0.1.0");
+    console.log("shaleme v0.1.1");
     process.exit(0);
   }
   const isJson = args.includes("--json");

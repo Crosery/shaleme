@@ -59,7 +59,7 @@ ${c.bold('支持的 Agent 平台:')}
   }
 
   if (args.includes('--version') || args.includes('-v')) {
-    console.log('shaleme v0.1.0');
+    console.log('shaleme v0.1.1');
     process.exit(0);
   }
 

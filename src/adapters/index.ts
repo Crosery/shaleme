@@ -248,7 +248,7 @@ export async function runUnifiedScan(
   const overallDroolLevel = getDroolLevel(overallDroolIndex);
 
   return {
-    version: '0.1.0',
+    version: '0.1.1',
     generatedAt: Date.now(),
     generatedDate: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
     totalDroolCount,
