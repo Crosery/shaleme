@@ -13,13 +13,8 @@
 无需安装复杂环境，直接使用 `npx` 或 `bunx` 即可秒级运行：
 
 ```bash
-# 直接通过 GitHub 源免安装执行（全平台秒跑）：
-npx github:Crosery/shaleme
-# 或使用 Bun:
-bunx github:Crosery/shaleme
-
-# 若全局安装或发布到 npm 后亦可直接：
 npx shaleme
+# 或者使用 Bun
 bunx shaleme
 ```
 
