@@ -56,6 +56,16 @@ bunx shaleme
 
 ---
 
+<div align="center">
+
+<img src="assets/all-models-drooling.jpg" alt="各大模型集体流口水" width="100%" />
+
+<sub>全员就位：GPT / Gemini / Claude / MiniMax / DeepSeek / Kimi / 千问 / GLM / Grok，一起对着排行榜流口水</sub>
+
+</div>
+
+---
+
 ## 目录
 
 - [核心特性](#核心特性)
