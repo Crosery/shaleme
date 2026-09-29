@@ -6,7 +6,7 @@ import { BaseAdapter, findFilesRecursively, forEachJsonLine, getHomeDir, querySq
 export class CodexAdapter extends BaseAdapter {
   readonly id: HarnessId = 'codex';
   readonly name = 'Codex';
-  readonly icon = '🟢';
+  readonly icon = 'Codex';
   readonly description = 'Codex CLI / Desktop 会话记录 (~/.codex)';
 
   private getCodexDir(): string {
@@ -56,16 +56,31 @@ export class CodexAdapter extends BaseAdapter {
 
     let count = 0;
     for (const file of files) {
-      const sessionId = path.basename(file, '.jsonl');
-      let currentModel = threadModels.get(sessionId) || 'codex-model';
+      // Extract thread UUID from rollout-2026-XX-XX-uuid.jsonl or filename
+      const uuidMatch = file.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+      const threadId = uuidMatch ? uuidMatch[0] : path.basename(file, '.jsonl');
+      let currentModel = threadModels.get(threadId) || 'gpt-5.4';
       const messagesInFile: ExtractedMessage[] = [];
 
       await forEachJsonLine(file, (data) => {
         // Track model from session_meta or turn_context
-        if (data.type === 'session_meta' && data.payload?.model) {
-          currentModel = data.payload.model;
-        } else if (data.type === 'turn_context' && data.payload?.model) {
-          currentModel = data.payload.model;
+        if (data.type === 'session_meta') {
+          const metaId = data.payload?.id || data.payload?.session_id;
+          if (metaId && threadModels.has(metaId)) {
+            currentModel = threadModels.get(metaId)!;
+          }
+          if (data.payload?.model) {
+            currentModel = data.payload.model;
+          }
+        } else if (data.type === 'turn_context') {
+          const p = data.payload || {};
+          if (p.model) {
+            currentModel = p.model;
+          } else if (p.collaboration_mode?.settings?.model) {
+            currentModel = p.collaboration_mode.settings.model;
+          } else if (p.info?.model) {
+            currentModel = p.info.model;
+          }
         }
 
         const payload = data.payload || {};
@@ -108,7 +123,7 @@ export class CodexAdapter extends BaseAdapter {
           if (onProgress && count % 50 === 0) onProgress(count);
           messagesInFile.push({
             harness: this.id,
-            sessionId,
+            sessionId: threadId,
             timestamp,
             model: currentModel,
             text,
