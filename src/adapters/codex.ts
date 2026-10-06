@@ -84,7 +84,9 @@ export class CodexAdapter extends BaseAdapter {
       /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
     );
     const threadId = uuidMatch ? uuidMatch[0] : path.basename(file, '.jsonl');
-    let currentModel = threadModels[threadId] || 'gpt-5.4';
+    // 查不到模型就归入 unknown 桶，绝不猜具体型号：猜错会把整段语料的
+    // 消息量灌进一个假模型行，稀释真实 MDI（0.1.4 及之前硬编码 gpt-5.4 的教训）。
+    let currentModel = threadModels[threadId] || 'codex-unknown';
     const messagesInFile: ExtractedMessage[] = [];
 
     await forEachJsonLine(file, (data) => {
