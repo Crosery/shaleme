@@ -1,0 +1,216 @@
+---
+export const prerender = false;
+
+import BaseLayout from '../layouts/BaseLayout.astro';
+import StatusBanner from '../components/StatusBanner.astro';
+import { getSessionCookieName, readViewerFromCookie } from '../lib/auth';
+import { getLeaderboardProfileByGithubId, hasDatabaseBinding } from '../lib/db';
+
+const viewer = await readViewerFromCookie(Astro.cookies.get(getSessionCookieName())?.value);
+const state = Astro.url.searchParams.get('state') ?? '';
+const rankValue = Number(Astro.url.searchParams.get('rank'));
+const rank = Number.isFinite(rankValue) && rankValue > 0 ? Math.trunc(rankValue) : 0;
+
+const profile =
+  viewer && hasDatabaseBinding() ? await getLeaderboardProfileByGithubId(viewer.githubId) : null;
+
+const phrase = '你说得对';
+---
+
+<BaseLayout
+  title="上传成绩 - shaleme"
+  description="在本机跑一次 shaleme，报告页点「上传到榜单」即可。只上传计数，不上传对话。"
+>
+  <div class="wrap">
+    <header class="masthead">
+      <span class="brand">SHALEME<span class="sub">上传</span></span>
+      <h1 class="chant" aria-label={phrase}>
+        {
+          [...phrase].map((char, index) => (
+            <span class="chant-char" style={`--i:${index}`} aria-hidden="true">
+              {char}
+            </span>
+          ))
+        }
+      </h1>
+      <p class="lede">一句「你说得对」，一次流口水。上榜只需三步。</p>
+    </header>
+
+    {state === 'submitted' || state === 'signed-in' || rank > 0 ? <StatusBanner state={state} rank={rank} /> : null}
+
+    <ol class="steps">
+      <li class="step">
+        <span class="step-no num">01</span>
+        <div class="step-body">
+          <h2>跑一次报告</h2>
+          <p class="step-copy">扫描本机的 coding agent 会话，全程离线。</p>
+          <pre class="cmd num"><code>npx shaleme</code></pre>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-no num">02</span>
+        <div class="step-body">
+          <h2>点「上传到榜单」</h2>
+          <p class="step-copy">
+            报告页底部，按钮直传本站。没登录会先绕一次 GitHub 授权，回来自动落榜。
+          </p>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-no num">03</span>
+        <div class="step-body">
+          <h2>看名次</h2>
+          <p class="step-copy">
+            分数按样本量收缩：聊得越多，分数越接近你的真实水平。
+          </p>
+        </div>
+      </li>
+    </ol>
+
+    {
+      profile ? (
+        <a class="mine" href={`/u/${encodeURIComponent(profile.login)}`}>
+          <img src={profile.avatarUrl} alt="" width="30" height="30" />
+          <span>我的成绩</span>
+          <span class="mine-score num">{profile.score.toFixed(1)}</span>
+          <span class="mine-arrow" aria-hidden="true">→</span>
+        </a>
+      ) : null
+    }
+
+    <p class="privacy">上传只有计数：没有对话正文，没有文件路径，没有机器标识。</p>
+
+    <footer class="foot">
+      <a href="/">← 回到榜单</a>
+    </footer>
+  </div>
+</BaseLayout>
+
+<style>
+  .masthead { padding: 56px 0 36px; }
+  .brand {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .brand .sub {
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--ink-3);
+    margin-left: 10px;
+  }
+
+  /* 「你说得对」逐字落下，像一句句重复的附和 */
+  .chant {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: clamp(3rem, 10vw, 6.2rem);
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    margin: var(--s-5) 0 var(--s-4);
+    display: flex;
+    gap: 0.04em;
+  }
+  .chant-char {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(0.45em);
+    animation: fall 0.55s var(--ease) forwards;
+    animation-delay: calc(var(--i) * 90ms);
+  }
+  /* 最后一个「对」微微颔首 */
+  .chant-char:last-child {
+    animation: fall 0.55s var(--ease) forwards, nod 2.6s var(--ease) infinite;
+    animation-delay: calc(var(--i) * 90ms), calc(var(--i) * 90ms + 0.8s);
+    background: linear-gradient(120deg, var(--ink) 60%, var(--accent) 60%);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+  @keyframes fall {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes nod {
+    0%, 100% { transform: rotate(0deg); }
+    12% { transform: rotate(4deg) translateY(2px); }
+    24% { transform: rotate(0deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chant-char { opacity: 1; transform: none; animation: none; }
+  }
+
+  .lede { color: var(--ink-2); max-width: 34em; }
+
+  .steps {
+    list-style: none;
+    margin: var(--s-7) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--s-6);
+    counter-reset: step;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: var(--s-4);
+    align-items: baseline;
+    padding-bottom: var(--s-6);
+    border-bottom: 1px solid var(--line);
+  }
+  .step:last-child { border-bottom: none; }
+  .step-no {
+    font-family: var(--font-serif);
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--line-strong);
+  }
+  .step h2 { font-size: var(--fs-lg); font-weight: 700; margin-bottom: 2px; }
+  .step-copy { color: var(--ink-2); font-size: var(--fs-md); max-width: 44em; }
+  .cmd {
+    margin-top: var(--s-3);
+    display: inline-block;
+    background: var(--ink);
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: var(--r-control);
+    font-size: var(--fs-md);
+    letter-spacing: 0;
+  }
+
+  .mine {
+    margin-top: var(--s-6);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: var(--fs-md);
+    transition: border-color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  }
+  .mine:hover { border-color: var(--ink-3); transform: translateY(-1px); }
+  .mine img { border-radius: 999px; }
+  .mine-score { color: var(--accent-strong); font-weight: 700; }
+  .mine-arrow { color: var(--ink-3); }
+
+  .privacy {
+    margin-top: var(--s-5);
+    color: var(--ink-3);
+    font-size: var(--fs-xs);
+  }
+
+  .foot {
+    margin-top: var(--s-8);
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--line);
+    font-size: var(--fs-sm);
+  }
+  .foot a { color: var(--accent-strong); text-decoration: none; }
+  .foot a:hover { text-decoration: underline; }
+</style>

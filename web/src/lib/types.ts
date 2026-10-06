@@ -49,6 +49,8 @@ export type LeaderboardEntry = {
   droolCount: number;
   assistantMessages: number;
   mdi: number;
+  /** 贝叶斯收缩后的排名分数，口径见 lib/db.ts 的 scoreExpr。 */
+  score: number;
   sessionsScanned: number;
   modelCount: number;
   updatedAt: number;
@@ -82,6 +84,7 @@ export type ModelLeaderboardEntry = {
   droolCount: number;
   assistantMessages: number;
   mdi: number;
+  score: number;
 };
 
 export type ModelLeaderboardGroup = {
@@ -94,6 +97,8 @@ export type HottestModel = {
   droolCount: number;
   assistantMessages: number;
   mdi: number;
+  /** 汇总样本上的收缩分数：人多的模型先验权重更稳。 */
+  score: number;
   contributors: number;
 };
 

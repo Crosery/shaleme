@@ -2,32 +2,342 @@
 export const prerender = false;
 
 import BaseLayout from '../layouts/BaseLayout.astro';
-import LeaderboardHome from '../components/LeaderboardHome.astro';
+import StatusBanner from '../components/StatusBanner.astro';
 import { getSessionCookieName, readViewerFromCookie } from '../lib/auth';
-import { getLeaderboardSummary, hasDatabaseBinding, listLeaderboard } from '../lib/db';
+import { getModelDashboard, hasDatabaseBinding, listLeaderboard } from '../lib/db';
+import { getMdiTier } from '../lib/report';
 
 const viewer = await readViewerFromCookie(Astro.cookies.get(getSessionCookieName())?.value);
 const databaseReady = hasDatabaseBinding();
 const state = Astro.url.searchParams.get('state') ?? '';
-const rankValue = Number(Astro.url.searchParams.get('rank'));
-const rank = Number.isFinite(rankValue) && rankValue > 0 ? Math.trunc(rankValue) : 0;
 
-const entries = databaseReady ? await listLeaderboard(100) : [];
-const summary = databaseReady
-  ? await getLeaderboardSummary()
-  : { participants: 0, totalDrool: 0, totalAssistantMessages: 0, averageMdi: 0 };
+const entries = databaseReady ? await listLeaderboard(50) : [];
+const dashboard = databaseReady ? await getModelDashboard(1, 12) : { hottestModels: [] };
+const maxScore = dashboard.hottestModels.length > 0 ? dashboard.hottestModels[0].score : 1;
+
+function fmt(value: number) {
+  return value.toLocaleString('en-US');
+}
 ---
 
 <BaseLayout
   title="shaleme 榜单 - 谁最爱说「你说得对」"
-  description="统计各大 Coding Agent 模型在面对用户质疑时的附和与认错频率，按命中次数与 MDI 排名。"
+  description="按样本量收缩后的流口水指数，给说「你说得对」最多的人和模型排名。"
 >
-  <LeaderboardHome
-    entries={entries}
-    summary={summary}
-    viewer={viewer}
-    state={state}
-    rank={rank}
-    databaseReady={databaseReady}
-  />
+  <div class="wrap">
+    <header class="masthead">
+      <div class="masthead-main">
+        <div>
+          <span class="brand">SHALEME<span class="sub">榜单</span></span>
+          <h1>谁最爱说<br />「你说得对」</h1>
+        </div>
+        <div class="head-side">
+          {
+            viewer ? (
+              <a class="viewer" href={`/u/${encodeURIComponent(viewer.login)}`} data-tip="我的成绩">
+                <img src={viewer.avatarUrl} alt="" width="30" height="30" />
+              </a>
+            ) : (
+              <a class="btn" href="/api/auth/github/login">GitHub 登录</a>
+            )
+          }
+        </div>
+      </div>
+      <div class="board-switch">
+        <div class="segmented" role="group" aria-label="榜单切换">
+          <button type="button" class="seg-btn" aria-pressed="true" data-board="people">
+            人榜 <span class="count num">{entries.length}</span>
+          </button>
+          <button type="button" class="seg-btn" aria-pressed="false" data-board="models">
+            模型榜 <span class="count num">{dashboard.hottestModels.length}</span>
+          </button>
+        </div>
+        <a class="btn-text btn howto" href="/upload">怎么上榜？</a>
+      </div>
+    </header>
+
+    <StatusBanner state={state} rank={0} />
+
+    {
+      !databaseReady ? (
+        <div class="empty-state">
+          <p>榜单还没接上数据库。</p>
+          <p>部署见 web/README.md。</p>
+        </div>
+      ) : (
+        <>
+          <section class="board" id="board-people">
+            {
+              entries.length === 0 ? (
+                <div class="empty-state">
+                  <p>还没有人上榜。</p>
+                  <a class="btn" href="/upload">怎么上榜 →</a>
+                </div>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th class="col-rank"></th>
+                      <th>人</th>
+                      <th class="right">命中</th>
+                      <th class="right">消息</th>
+                      <th class="right">
+                        <span data-tip="贝叶斯收缩后的 MDI：样本越少越向全局均值收，信息越多置信度越高">
+                          分数
+                        </span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map((entry) => {
+                      const tier = getMdiTier(entry.score);
+                      return (
+                        <tr>
+                          <td class="col-rank">
+                            <span class:list={['rank-num', 'num', entry.rank <= 3 && 'podium']}>
+                              {entry.rank}
+                            </span>
+                          </td>
+                          <td>
+                            <a class="who" href={`/u/${encodeURIComponent(entry.login)}`}>
+                              <img src={entry.avatarUrl} alt="" width="26" height="26" loading="lazy" />
+                              <span>{entry.displayName}</span>
+                            </a>
+                          </td>
+                          <td class="right num">{fmt(entry.droolCount)}</td>
+                          <td class="right num muted">{fmt(entry.assistantMessages)}</td>
+                          <td class="right">
+                            <span class="score num" data-tip={`原始 MDI ${entry.mdi.toFixed(2)}`}>
+                              {entry.score.toFixed(1)}
+                            </span>
+                            <span class="tier" style={`color:${tier.color};`}>
+                              {tier.badge}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )
+            }
+          </section>
+
+          <section class="board" id="board-models" hidden>
+            {
+              dashboard.hottestModels.length === 0 ? (
+                <div class="empty-state">
+                  <p>还没有带模型明细的提交。</p>
+                </div>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th class="col-rank"></th>
+                      <th>模型</th>
+                      <th class="right">命中</th>
+                      <th class="right">消息</th>
+                      <th class="right">分数</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.hottestModels.map((model, index) => {
+                      const tier = getMdiTier(model.score);
+                      return (
+                        <tr>
+                          <td class="col-rank">
+                            <span class:list={['rank-num', 'num', index + 1 <= 3 && 'podium']}>
+                              {index + 1}
+                            </span>
+                          </td>
+                          <td>
+                            <a class="model-name" href={`/models#${encodeURIComponent(model.model)}`}>
+                              {model.model}
+                            </a>
+                            <span
+                              class="mdi-bar"
+                              aria-hidden="true"
+                              style={`--w:${Math.max(2, Math.round((model.score / maxScore) * 100))}%`}
+                            >
+                              <span class="mdi-fill" style={`background:${tier.color};`}></span>
+                            </span>
+                          </td>
+                          <td class="right num">{fmt(model.droolCount)}</td>
+                          <td class="right num muted">{fmt(model.assistantMessages)}</td>
+                          <td class="right">
+                            <span class="score num" data-tip={`原始 MDI ${model.mdi.toFixed(2)} · ${model.contributors} 人提交`}>
+                              {model.score.toFixed(1)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )
+            }
+          </section>
+        </>
+      )
+    }
+
+    <footer class="foot">
+      分数 = 按样本量收缩后的 MDI（每千条 assistant 消息的「你说得对」次数）· 只含计数，不含对话内容 ·{" "}
+      <a href="https://github.com/Crosery/shaleme">源码</a>
+    </footer>
+  </div>
 </BaseLayout>
+
+<script>
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.seg-btn[data-board]'));
+
+  function select(board: string) {
+    for (const button of buttons) {
+      const active = button.dataset.board === board;
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      const panel = document.getElementById(`board-${button.dataset.board}`);
+      if (panel) {
+        panel.hidden = !active;
+      }
+    }
+  }
+
+  for (const button of buttons) {
+    button.addEventListener('click', () => select(button.dataset.board ?? 'people'));
+  }
+
+  document.querySelector('.segmented')?.addEventListener('keydown', (event) => {
+    const e = event as KeyboardEvent;
+    const items = buttons;
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (current === -1) return;
+    let next = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (current + 1) % items.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (current - 1 + items.length) % items.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = items.length - 1;
+    if (next === -1) return;
+    e.preventDefault();
+    items[next].focus();
+    select(items[next].dataset.board ?? 'people');
+  });
+</script>
+
+<style>
+  .masthead {
+    padding: 44px 0 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .masthead-main {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-5);
+  }
+  .brand {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .brand .sub {
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--ink-3);
+    margin-left: 10px;
+  }
+  h1 {
+    font-family: var(--font-serif);
+    font-size: var(--fs-3xl);
+    font-weight: 700;
+    line-height: 1.35;
+    margin-top: 14px;
+  }
+  .head-side { display: flex; align-items: center; gap: var(--s-3); }
+  .viewer img { border-radius: 999px; border: 1px solid var(--line); }
+  .board-switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4);
+    margin-top: var(--s-5);
+  }
+  .count { color: var(--ink-3); font-size: 0.76rem; margin-left: 4px; }
+  .seg-btn[aria-pressed='true'] .count { color: rgba(255, 255, 255, 0.65); }
+  .howto { font-size: var(--fs-sm); }
+
+  .board { margin-top: var(--s-5); }
+
+  .col-rank { width: 56px; }
+  .rank-num {
+    font-size: 0.95rem;
+    color: var(--ink-3);
+    font-weight: 700;
+  }
+  .rank-num.podium {
+    font-family: var(--font-serif);
+    font-size: 1.7rem;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .who {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .who img { border-radius: 999px; }
+  .who:hover { color: var(--accent-strong); }
+  .model-name {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .model-name:hover { color: var(--accent-strong); }
+  .muted { color: var(--ink-3); }
+  .score {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .tier {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .mdi-bar {
+    display: block;
+    height: 3px;
+    margin-top: 6px;
+    background: var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+    max-width: 220px;
+  }
+  .mdi-fill {
+    display: block;
+    height: 100%;
+    width: var(--w);
+    border-radius: 999px;
+  }
+
+  .foot {
+    margin-top: var(--s-8);
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--line);
+    color: var(--ink-3);
+    font-size: var(--fs-xs);
+  }
+  .foot a { color: inherit; }
+
+  @media (max-width: 720px) {
+    .masthead { padding-top: 24px; }
+    .tier { display: none; }
+    td.right, th.right { padding-left: 8px; padding-right: 8px; }
+  }
+</style>

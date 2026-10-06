@@ -1,9 +1,7 @@
 /**
  * D1 数据访问层。
  *
- * 所有 SQL 集中在这里，页面和 API 路由只调函数。榜单名次统一由
- * ROW_NUMBER() OVER (ORDER BY drool_count DESC, mdi DESC, assistant_messages DESC, updated_at ASC)
- * 算出，改动排序口径时只改 SQL 常量，不要散落到各个页面。
+ * 所有 SQL 集中在这里，页面和 API 路由只调函数。
  */
 
 import { env } from 'cloudflare:workers';
@@ -20,10 +18,59 @@ import type {
 } from './types';
 
 /**
- * 名次口径。四处地方用它，必须完全一致：
- * 列表查询的 ORDER BY、ROW_NUMBER() 的窗口、以及 0001_init.sql 里的索引。
+ * 名次口径：贝叶斯收缩分数。
+ *
+ *   score = (drool + PRIOR_MASS × 全局命中率) / (messages + PRIOR_MASS) × 1000
+ *
+ * 原始 MDI 对样本量没有记忆：3.5k 条消息的 27.42 会碾压 15k 条消息的 6.8，
+ * 但前者可能只是几段闲聊里碰巧连发附和。收缩把小样本往全局均值拉、
+ * 大样本几乎不动——信息越多置信度越高，分数越接近真值。
+ * PRIOR_MASS = 5000 条伪计数：5k 消息的行约一半权重来自先验，20k+ 基本是实测。
  */
-const RANK_ORDER_SQL = 'drool_count DESC, mdi DESC, assistant_messages DESC, updated_at ASC';
+const PRIOR_MASS = 5000;
+
+/**
+ * 收缩分数表达式（列名限定前缀由调用方拼接）。
+ * prior 子查询 = 全局命中率（Σdrool/Σmessages），全体行共用同一个先验。
+ */
+function scoreExpr(prefix: string) {
+  return (
+    `(${prefix}drool_count + ${PRIOR_MASS} * prior.rate) ` +
+    `/ (${prefix}assistant_messages + ${PRIOR_MASS}) * 1000`
+  );
+}
+
+/** 全局命中率先验，CROSS JOIN 进任何排名查询。 */
+const PRIOR_CTE_SQL = `
+  WITH prior AS (
+    SELECT
+      CASE WHEN SUM(assistant_messages) > 0
+        THEN SUM(drool_count) * 1.0 / SUM(assistant_messages)
+        ELSE 0
+      END AS rate
+    FROM leaderboard_entries
+  )
+`;
+
+/**
+ * 名次口径。改排序只改这里：score（收缩后）优先，同分再看原始信号强度。
+ * score 是运行时算出的表达式，不能进索引；数据量大了再物化成列。
+ */
+const ENTRY_RANK_ORDER_SQL =
+  `${scoreExpr('')} DESC, drool_count DESC, assistant_messages DESC, updated_at ASC`;
+
+const MODEL_PRIOR_CTE_SQL = `
+  WITH prior AS (
+    SELECT
+      CASE WHEN SUM(assistant_messages) > 0
+        THEN SUM(drool_count) * 1.0 / SUM(assistant_messages)
+        ELSE 0
+      END AS rate
+    FROM leaderboard_submission_models
+  )
+`;
+const MODEL_RANK_ORDER_SQL =
+  `${scoreExpr('m.')} DESC, m.drool_count DESC, m.assistant_messages DESC, m.created_at ASC`;
 
 const ENTRY_COLUMNS_SQL = `
   github_id AS githubId,
@@ -67,6 +114,7 @@ type HottestModelRow = {
   droolCount: number;
   assistantMessages: number;
   mdi: number;
+  score: number;
   contributors: number;
 };
 
@@ -87,18 +135,21 @@ export async function listLeaderboard(limit = 100) {
   const result = await database
     .prepare(
       `
-        SELECT ${ENTRY_COLUMNS_SQL}
-        FROM leaderboard_entries
-        ORDER BY ${RANK_ORDER_SQL}
+        ${PRIOR_CTE_SQL}
+        SELECT ${ENTRY_COLUMNS_SQL},
+          ${scoreExpr('')} AS score
+        FROM leaderboard_entries CROSS JOIN prior
+        ORDER BY ${ENTRY_RANK_ORDER_SQL}
         LIMIT ?
       `,
     )
     .bind(limit)
-    .all<LeaderboardRow>();
+    .all<LeaderboardRow & { score: number }>();
 
   return result.results.map((row, index) => ({
     rank: index + 1,
     ...row,
+    score: Number(row.score),
   })) satisfies LeaderboardEntry[];
 }
 
@@ -139,24 +190,34 @@ async function getLeaderboardProfileByPredicate(
   const row = await database
     .prepare(
       `
-        WITH ranked_entries AS (
-          SELECT
-            github_id,
-            login,
-            display_name,
-            avatar_url,
-            profile_url,
-            drool_count,
-            assistant_messages,
-            mdi,
-            sessions_scanned,
-            model_count,
-            version,
-            generated_at,
-            updated_at,
-            ROW_NUMBER() OVER (ORDER BY ${RANK_ORDER_SQL}) AS rank
-          FROM leaderboard_entries
-        )
+        WITH
+          prior AS (
+            SELECT
+              CASE WHEN SUM(assistant_messages) > 0
+                THEN SUM(drool_count) * 1.0 / SUM(assistant_messages)
+                ELSE 0
+              END AS rate
+            FROM leaderboard_entries
+          ),
+          ranked_entries AS (
+            SELECT
+              github_id,
+              login,
+              display_name,
+              avatar_url,
+              profile_url,
+              drool_count,
+              assistant_messages,
+              mdi,
+              ${scoreExpr('')} AS score,
+              sessions_scanned,
+              model_count,
+              version,
+              generated_at,
+              updated_at,
+              ROW_NUMBER() OVER (ORDER BY ${ENTRY_RANK_ORDER_SQL}) AS rank
+            FROM leaderboard_entries CROSS JOIN prior
+          )
         SELECT
           ranked_entries.rank AS rank,
           ranked_entries.github_id AS githubId,
@@ -167,6 +228,7 @@ async function getLeaderboardProfileByPredicate(
           ranked_entries.drool_count AS droolCount,
           ranked_entries.assistant_messages AS assistantMessages,
           ranked_entries.mdi AS mdi,
+          ranked_entries.score AS score,
           ranked_entries.sessions_scanned AS sessionsScanned,
           ranked_entries.model_count AS modelCount,
           ranked_entries.updated_at AS updatedAt,
@@ -203,6 +265,7 @@ async function getLeaderboardProfileByPredicate(
     droolCount: row.droolCount,
     assistantMessages: row.assistantMessages,
     mdi: row.mdi,
+    score: Number(row.score),
     sessionsScanned: row.sessionsScanned,
     modelCount: row.modelCount,
     updatedAt: row.updatedAt,
@@ -226,20 +289,26 @@ export async function getViewerEntry(githubId: number) {
   const row = await database
     .prepare(
       `
-        SELECT ${ENTRY_COLUMNS_SQL}
-        FROM leaderboard_entries
+        ${PRIOR_CTE_SQL}
+        SELECT ${ENTRY_COLUMNS_SQL},
+          ${scoreExpr('')} AS score
+        FROM leaderboard_entries CROSS JOIN prior
         WHERE github_id = ?
       `,
     )
     .bind(githubId)
-    .first<LeaderboardRow>();
+    .first<LeaderboardRow & { score: number }>();
 
-  return row ?? null;
+  if (!row) {
+    return null;
+  }
+
+  return { ...row, score: Number(row.score) } satisfies LeaderboardRow;
 }
 
 /**
  * 单模型榜：同一个人在同一模型上可能留了多条历史记录，先按「本人最好的一次」去重，
- * 再在每个模型内部按 MDI 排名。
+ * 再在每个模型内部按收缩分数排名（小样本往全局均值收，见 scoreExpr）。
  *
  * 注意 PARTITION BY 用 model + github_id 而不是只用 github_id：同一次提交里的模型名
  * 是唯一的，但不同次提交的模型名可能因为版本升级而变，按 github_id 单独分区会错杀。
@@ -250,22 +319,25 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
   const topModelsResult = await database
     .prepare(
       `
-        WITH best_per_user AS (
+        ${MODEL_PRIOR_CTE_SQL},
+        best_per_user AS (
           SELECT
             m.model AS model,
             m.github_id AS githubId,
             m.drool_count AS droolCount,
             m.assistant_messages AS assistantMessages,
             m.mdi AS mdi,
+            ${scoreExpr('m.')} AS score,
             e.login AS login,
             e.display_name AS displayName,
             e.avatar_url AS avatarUrl,
             ROW_NUMBER() OVER (
               PARTITION BY m.model, m.github_id
-              ORDER BY m.mdi DESC, m.drool_count DESC, m.created_at ASC
+              ORDER BY ${MODEL_RANK_ORDER_SQL}
             ) AS user_rank
           FROM leaderboard_submission_models AS m
           JOIN leaderboard_entries AS e ON e.github_id = m.github_id
+          CROSS JOIN prior
         ),
         ranked AS (
           SELECT
@@ -276,9 +348,10 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
             droolCount,
             assistantMessages,
             mdi,
+            score,
             ROW_NUMBER() OVER (
               PARTITION BY model
-              ORDER BY mdi DESC, droolCount DESC, assistantMessages DESC, login ASC
+              ORDER BY score DESC, droolCount DESC, assistantMessages DESC, login ASC
             ) AS model_rank
           FROM best_per_user
           WHERE user_rank = 1
@@ -291,6 +364,7 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
           droolCount,
           assistantMessages,
           mdi,
+          score,
           model_rank AS rank
         FROM ranked
         WHERE model_rank <= ?
@@ -303,6 +377,7 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
   const hottestModelsResult = await database
     .prepare(
       `
+        ${MODEL_PRIOR_CTE_SQL}
         SELECT
           model,
           COALESCE(SUM(drool_count), 0) AS droolCount,
@@ -311,10 +386,12 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
             THEN SUM(drool_count) * 1000.0 / SUM(assistant_messages)
             ELSE 0
           END AS mdi,
+          (SUM(drool_count) + ${PRIOR_MASS} * prior.rate)
+            / (SUM(assistant_messages) + ${PRIOR_MASS}) * 1000 AS score,
           COUNT(DISTINCT github_id) AS contributors
-        FROM leaderboard_submission_models
-        GROUP BY model
-        ORDER BY mdi DESC, droolCount DESC, model ASC
+        FROM leaderboard_submission_models CROSS JOIN prior
+        GROUP BY model, prior.rate
+        ORDER BY score DESC, droolCount DESC, model ASC
         LIMIT ?
       `,
     )
@@ -341,6 +418,7 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
       droolCount: Number(row.droolCount),
       assistantMessages: Number(row.assistantMessages),
       mdi: Number(row.mdi),
+      score: Number(row.score),
       contributors: Number(row.contributors),
     })),
   } satisfies ModelDashboard;

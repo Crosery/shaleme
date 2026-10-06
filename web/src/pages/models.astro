@@ -2,330 +2,197 @@
 export const prerender = false;
 
 import BaseLayout from '../layouts/BaseLayout.astro';
-import SiteHeader from '../components/SiteHeader.astro';
-import StatusBanner from '../components/StatusBanner.astro';
-import { getMdiTier } from '../lib/report';
 import { getSessionCookieName, readViewerFromCookie } from '../lib/auth';
 import { getModelDashboard, hasDatabaseBinding } from '../lib/db';
+import { getMdiTier } from '../lib/report';
 
 const viewer = await readViewerFromCookie(Astro.cookies.get(getSessionCookieName())?.value);
 const databaseReady = hasDatabaseBinding();
-const state = Astro.url.searchParams.get('state') ?? '';
-const dashboard = databaseReady
-  ? await getModelDashboard()
-  : { modelGroups: [], hottestModels: [] };
+const dashboard = databaseReady ? await getModelDashboard(10, 12) : { modelGroups: [], hottestModels: [] };
+
+function fmt(value: number) {
+  return value.toLocaleString('en-US');
+}
 ---
 
 <BaseLayout
   title="模型榜 - shaleme"
-  description="按 MDI 与命中次数对比各模型在用户质疑时的附和倾向，并把同一个模型下最严重的账号排出来。"
+  description="每个模型下最会附和的账号，按样本量收缩后的分数排名。"
 >
-  <main class="shell">
-    <SiteHeader
-      title="shaleme 榜单"
-      subtitle="谁家的模型最爱说「你说得对」"
-      viewer={viewer}
-      active="models"
-    />
-
-    <StatusBanner state={state} rank={0} />
-
-    {
-      !databaseReady ? (
-        <div class="surface setup-notice">
-          <h2 class="section-title">榜单还没接上数据库</h2>
-          <p class="setup-copy">
-            Worker 缺少 D1 的 <span class="numeric">DB</span> 绑定。按 web/README.md 补齐后这里会显示模型维度排名。
-          </p>
+  <div class="wrap">
+    <header class="masthead">
+      <div class="masthead-main">
+        <div>
+          <span class="brand">SHALEME<span class="sub">模型榜</span></span>
+          <h1>按模型拆开看</h1>
         </div>
-      ) : (
-        <>
-          <section class="surface hot">
-            <div class="panel-head">
-              <div>
-                <h2 class="section-title">最烫的模型</h2>
-                <p class="section-copy">
-                  把所有人的同一模型行按命中次数与消息数汇总后重算 MDI，衡量模型本身的附和倾向
-                </p>
-              </div>
-            </div>
-
-            {
-              dashboard.hottestModels.length === 0 ? (
-                <p class="empty-copy">还没有提交数据。</p>
-              ) : (
-                <div class="hot-grid">
-                  {dashboard.hottestModels.map((entry) => {
-                    const tier = getMdiTier(entry.mdi);
-
-                    return (
-                      <article class="hot-card">
-                        <div class="hot-card-head">
-                          <span class="hot-model">{entry.model}</span>
-                          <span
-                            class="tier-chip"
-                            style={`color:${tier.color};border-color:${tier.color}44;background:${tier.color}12;`}
-                          >
-                            {tier.badge}
-                          </span>
-                        </div>
-                        <div class="hot-mdi numeric">{entry.mdi.toFixed(2)}</div>
-                        <div class="hot-meta">
-                          <span>
-                            <span class="numeric strong">{entry.droolCount.toLocaleString('en-US')}</span> 次命中
-                          </span>
-                          <span>
-                            <span class="numeric strong">
-                              {entry.assistantMessages.toLocaleString('en-US')}
-                            </span> 条消息
-                          </span>
-                          <span>
-                            <span class="numeric strong">{entry.contributors}</span> 人提交
-                          </span>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              )
-            }
-          </section>
-
+        <div class="head-side">
+          <a class="btn" href="/">← 榜单</a>
           {
-            dashboard.modelGroups.map((group) => (
-              <section class="surface model-panel">
-                <div class="panel-head">
-                  <div>
-                    <h2 class="section-title">{group.model}</h2>
-                    <p class="section-copy">同一用户在该模型上只取最好的一次</p>
-                  </div>
-                </div>
-                <div class="table-shell">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th class="col-rank">名次</th>
-                        <th>账号</th>
-                        <th class="col-number">命中</th>
-                        <th class="col-number">assistant 消息</th>
-                        <th class="col-number">MDI</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.rows.map((entry) => (
-                        <tr>
-                          <td class="col-rank numeric rank-cell">#{entry.rank}</td>
-                          <td>
-                            <a class="account-cell" href={`/u/${encodeURIComponent(entry.login)}`}>
-                              <img
-                                class="account-avatar"
-                                src={entry.avatarUrl}
-                                alt=""
-                                width="30"
-                                height="30"
-                                loading="lazy"
-                              />
-                              <span>
-                                <span class="account-name">{entry.displayName}</span>
-                                <span class="account-handle">@{entry.login}</span>
-                              </span>
-                            </a>
-                          </td>
-                          <td class="col-number numeric strong">
-                            {entry.droolCount.toLocaleString('en-US')}
-                          </td>
-                          <td class="col-number numeric muted-cell">
-                            {entry.assistantMessages.toLocaleString('en-US')}
-                          </td>
-                          <td class="col-number numeric strong">{entry.mdi.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            ))
-          }
-
-          {
-            dashboard.modelGroups.length === 0 && (
-              <p class="empty-copy">
-                还没有带模型明细的提交。用较新版本的 shaleme 重新生成报告再提交即可。
-              </p>
+            viewer ? (
+              <a class="viewer" href={`/u/${encodeURIComponent(viewer.login)}`} data-tip="我的成绩">
+                <img src={viewer.avatarUrl} alt="" width="30" height="30" />
+              </a>
+            ) : (
+              <a class="btn" href="/api/auth/github/login">GitHub 登录</a>
             )
           }
-        </>
+        </div>
+      </div>
+    </header>
+
+    {
+      !databaseReady || dashboard.modelGroups.length === 0 ? (
+        <div class="empty-state">
+          <p>还没有带模型明细的提交。</p>
+          <a class="btn" href="/upload">怎么上榜 →</a>
+        </div>
+      ) : (
+        dashboard.modelGroups.map((group) => (
+          <section class="panel" id={group.model}>
+            <div class="panel-head">
+              <h2 class="model-title num">{group.model}</h2>
+              {
+                group.rows[0] && (
+                  <span class="panel-top">
+                    榜首 <span class="num">{group.rows[0].score.toFixed(1)}</span>
+                  </span>
+                )
+              }
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th class="col-rank"></th>
+                  <th>账号</th>
+                  <th class="right">命中</th>
+                  <th class="right">消息</th>
+                  <th class="right">分数</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.rows.map((entry) => {
+                  const tier = getMdiTier(entry.score);
+                  return (
+                    <tr>
+                      <td class="col-rank">
+                        <span class:list={['rank-num', 'num', entry.rank <= 3 && 'podium']}>
+                          {entry.rank}
+                        </span>
+                      </td>
+                      <td>
+                        <a class="who" href={`/u/${encodeURIComponent(entry.login)}`}>
+                          <img src={entry.avatarUrl} alt="" width="26" height="26" loading="lazy" />
+                          <span>{entry.displayName}</span>
+                        </a>
+                      </td>
+                      <td class="right num">{fmt(entry.droolCount)}</td>
+                      <td class="right num muted">{fmt(entry.assistantMessages)}</td>
+                      <td class="right">
+                        <span class="score num" data-tip={`原始 MDI ${entry.mdi.toFixed(2)}`}>
+                          {entry.score.toFixed(1)}
+                        </span>
+                        <span class="tier" style={`color:${tier.color};`}>{tier.badge}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
+        ))
       )
     }
-  </main>
+
+    <footer class="foot">
+      同一账号在同一模型上只取最好的一次 · 分数按样本量收缩 ·{" "}
+      <a href="https://github.com/Crosery/shaleme">源码</a>
+    </footer>
+  </div>
 </BaseLayout>
 
 <style>
-  .setup-notice {
-    padding: 18px;
-    border-left: 3px solid var(--amber);
+  .masthead {
+    padding: 44px 0 28px;
+    border-bottom: 1px solid var(--line);
   }
-
-  .setup-copy,
-  .empty-copy {
-    margin: 8px 0 0;
-    color: var(--text-secondary);
-    font-size: 14px;
+  .masthead-main {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-5);
   }
-
-  .hot,
-  .model-panel {
-    padding: 18px;
-    margin-bottom: 16px;
+  .brand {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
   }
+  .brand .sub {
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--ink-3);
+    margin-left: 10px;
+  }
+  h1 {
+    font-family: var(--font-serif);
+    font-size: var(--fs-3xl);
+    font-weight: 700;
+    line-height: 1.35;
+    margin-top: 14px;
+  }
+  .head-side { display: flex; align-items: center; gap: var(--s-3); }
+  .viewer img { border-radius: 999px; border: 1px solid var(--line); }
 
+  .panel { margin-top: var(--s-7); }
   .panel-head {
     display: flex;
-    align-items: flex-start;
+    align-items: baseline;
     justify-content: space-between;
-    gap: 14px;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
+    margin-bottom: var(--s-3);
   }
-
-  .hot-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .hot-card {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--bg-subtle);
-    padding: 14px;
-  }
-
-  .hot-card-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 10px;
-  }
-
-  .hot-model {
+  .model-title {
+    font-size: var(--fs-xl);
     font-weight: 700;
-    font-size: 14px;
-    word-break: break-word;
+    letter-spacing: -0.01em;
   }
+  .panel-top { color: var(--ink-3); font-size: var(--fs-sm); }
+  .panel-top .num { color: var(--ink); font-weight: 700; }
 
-  .tier-chip {
-    border: 1px solid;
-    border-radius: 999px;
-    padding: 2px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-    flex: 0 0 auto;
+  .col-rank { width: 56px; }
+  .rank-num { font-size: 0.95rem; color: var(--ink-3); font-weight: 700; }
+  .rank-num.podium {
+    font-family: var(--font-serif);
+    font-size: 1.7rem;
+    color: var(--ink);
+    line-height: 1;
   }
-
-  .hot-mdi {
-    font-size: 26px;
-    font-weight: 700;
-    line-height: 1.1;
-    color: var(--primary);
-    margin-bottom: 10px;
-  }
-
-  .hot-meta {
-    display: grid;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--muted);
-  }
-
-  .strong {
-    font-weight: 700;
-    color: var(--text-secondary);
-  }
-
-  .table-shell {
-    overflow: auto;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  th,
-  td {
-    text-align: left;
-    padding: 12px;
-    border-bottom: 1px solid var(--border);
-    font-size: 14px;
-    vertical-align: middle;
-    white-space: nowrap;
-  }
-
-  th {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--muted);
-    background: var(--bg-subtle);
-    position: sticky;
-    top: 0;
-  }
-
-  tbody tr:last-child td {
-    border-bottom: none;
-  }
-
-  .col-rank {
-    width: 68px;
-  }
-
-  .col-number {
-    text-align: right;
-  }
-
-  .rank-cell {
-    font-weight: 700;
-    color: var(--primary);
-  }
-
-  .muted-cell {
-    color: var(--muted);
-  }
-
-  .account-cell {
-    display: flex;
+  .who {
+    display: inline-flex;
     align-items: center;
     gap: 10px;
     text-decoration: none;
-  }
-
-  .account-avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 6px;
-    object-fit: cover;
-    flex: 0 0 auto;
-  }
-
-  .account-name {
-    display: block;
     font-weight: 600;
   }
+  .who img { border-radius: 999px; }
+  .who:hover { color: var(--accent-strong); }
+  .muted { color: var(--ink-3); }
+  .score { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+  .tier { display: block; font-size: 0.72rem; font-weight: 600; line-height: 1.4; }
 
-  .account-handle {
-    display: block;
-    color: var(--muted);
-    font-size: 12px;
-    margin-top: 2px;
+  .foot {
+    margin-top: var(--s-8);
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--line);
+    color: var(--ink-3);
+    font-size: var(--fs-xs);
   }
+  .foot a { color: inherit; }
 
-  @media (max-width: 900px) {
-    .hot-grid {
-      grid-template-columns: 1fr;
-    }
+  @media (max-width: 720px) {
+    .tier { display: none; }
+    td.right, th.right { padding-left: 8px; padding-right: 8px; }
   }
 </style>

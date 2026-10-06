@@ -32,10 +32,11 @@ web/
 │   │   ├── db.ts                   # 全部 SQL 集中在这里
 │   │   ├── report.ts               # 提交载荷校验与 MDI 分档
 │   │   └── types.ts                # 与 CLI 对齐的载荷类型
-│   ├── components/                 # 纯展示组件
+│   ├── components/                 # SiteHeader / StatusBanner
 │   └── pages/
-│       ├── index.astro             # 总榜
-│       ├── models.astro            # 模型榜
+│       ├── index.astro             # 榜单：人榜 + 模型榜双榜切换
+│       ├── models.astro            # 单模型下钻
+│       ├── upload.astro            # 上传说明 + 提交结果落点
 │       ├── submit.ts               # 报告页「上传到榜单」的落点
 │       ├── u/[login].astro         # 个人成绩页
 │       └── api/auth/github/        # login / callback / logout
@@ -105,18 +106,20 @@ export SHALEME_LEADERBOARD_URL=https://shaleme.example.com/submit
 
 ## 排名口径
 
-总榜名次：
+原始 MDI 对样本量没有记忆：3.5k 条消息碰巧连发附和能刷出 27，23k 条消息的稳定 8 会被压住。
+榜单统一按**贝叶斯收缩分数**排名（人榜与模型榜同一口径，`src/lib/db.ts` 的 `scoreExpr` 是唯一真源）：
 
 ```
-drool_count DESC, mdi DESC, assistant_messages DESC, updated_at ASC
+score = (drool + PRIOR_MASS × 全局命中率) / (assistant_messages + PRIOR_MASS) × 1000
+PRIOR_MASS = 5000（伪计数）
 ```
 
-由 `ROW_NUMBER() OVER (...)` 算出，`migrations/0001_init.sql` 里的
-`leaderboard_entries_rank_idx` 按同一顺序建，`src/lib/db.ts` 的 `RANK_ORDER_SQL`
-是唯一真源。改口径要同时改这三处。
+小样本被拉向全局均值、大样本几乎不动——信息越多置信度越高。同分再按
+`drool_count DESC, assistant_messages DESC, updated_at ASC` 断序。原始 MDI 仍然展示
+（tooltip），只是不再直接决定名次。
 
-**未在页面上开放按列切换排序**：索引只能匹配一种排序方向，开放给 URL 参数等于
-让任意一次请求都能触发全表排序。需要别的口径时再加物化或加索引。
+`migrations/0001_init.sql` 里的 `leaderboard_entries_rank_idx` 是旧口径（drool_count 优先）
+遗留的，score 是运行时表达式走不了索引；数据量大了再把 score 物化成列。
 
 MDI 分档阈值与 CLI 的 `getDroolLevel` 一致，报告和榜单不会对同一模型给出两套标签：
 

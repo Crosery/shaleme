@@ -50,11 +50,11 @@ export const POST: APIRoute = async ({ cookies, redirect, request, url }) => {
     const profile = await getLeaderboardProfileByGithubId(viewer.githubId);
 
     return redirect(
-      `/u/${encodeURIComponent(viewer.login)}?state=submitted&rank=${profile?.rank ?? 0}`,
+      `/upload?state=submitted&rank=${profile?.rank ?? 0}`,
     );
   }
 
-  const returnTo = '/';
+  const returnTo = '/upload';
   const token = await createPendingSubmission(payload, getPendingSubmissionMaxAge() * 1000);
   const loginUrl = new URL('/api/auth/github/login', url.origin);
   loginUrl.searchParams.set('pending', token);
@@ -76,7 +76,7 @@ export const POST: APIRoute = async ({ cookies, redirect, request, url }) => {
   return redirect(`${loginUrl.pathname}${loginUrl.search}`);
 };
 
-/** 浏览器直接打开 /submit 没有载荷可提交，回首页而不是抛 405。 */
+/** 浏览器直接打开 /submit 没有载荷可提交，去上传说明页而不是抛 405。 */
 export const GET: APIRoute = ({ redirect }) => {
-  return redirect('/?state=submit-requires-form');
+  return redirect('/upload?state=submit-requires-form');
 };
