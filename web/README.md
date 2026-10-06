@@ -32,7 +32,7 @@ web/
 │   │   ├── db.ts                   # 全部 SQL 集中在这里
 │   │   ├── report.ts               # 提交载荷校验与 MDI 分档
 │   │   └── types.ts                # 与 CLI 对齐的载荷类型
-│   ├── components/                 # SiteHeader / StatusBanner
+│   ├── components/                 # StatusBanner
 │   └── pages/
 │       ├── index.astro             # 榜单：人榜 + 模型榜双榜切换
 │       ├── models.astro            # 单模型下钻
