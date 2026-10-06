@@ -1827,7 +1827,7 @@ async function runUnifiedScan(options = {}, detector = new SycophancyDetector) {
     stats,
     harnessStats,
     activeHarnessCount,
-    version: "0.1.3"
+    version: "0.1.4"
   });
 }
 // src/report/generator.ts
@@ -3071,7 +3071,7 @@ ${c.bold("支持的 Agent 平台:")}
     process.exit(0);
   }
   if (args.includes("--version") || args.includes("-v")) {
-    console.log("shaleme v0.1.3");
+    console.log("shaleme v0.1.4");
     process.exit(0);
   }
   const isJson = args.includes("--json");

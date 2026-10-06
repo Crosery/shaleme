@@ -22,12 +22,19 @@
 6. **trust 配置创建后 2 天内必须完成首次 CI 发布**，否则过期作废，只能删了重建。
    所以「配 trust → 推 tag」要连着做。
 
-## 当前状态（2026-10-06 首发后适用）
+## 当前状态（2026-10-07 更新）
 
-- 包 `shaleme` 已在 registry（0.1.3 起），本地首发完成，trusted publisher
-  配置在 <https://www.npmjs.com/package/shaleme/access>。
+- 包 `shaleme` 已在 registry：0.1.3 为「本地首发」产物（npm 11.19 把新包的首发
+  自动走了 staged publishing：先落一个 `0.0.0-stage` 占位版本，真正的 0.1.3 在
+  registry 处理完占位后入库；期间盲目重试会得到 `409 Failed to save packument`，
+  正确做法是等一两分钟再查 `npm view shaleme version`，别连点）。
+- Trusted publisher 已用 CLI 建立（无需去网页）：
+  `npm trust github shaleme --repo Crosery/shaleme --file publish.yml --allow-publish --auth-type=web`
+  验证：`npm trust list shaleme` → permissions: publish, stage publish。
+  **注意：trust 建立后 2 天内必须完成首次 CI 发布**（10-09 前推 `v0.1.4`），
+  否则过期需重建。
 - 之后发版的唯一入口：`.github/workflows/publish.yml`，唯一触发条件：`v*` tag push。
-- 只 push `main` 不会发包。
+  只 push `main` 不会发包。
 
 ## 发布前检查
 

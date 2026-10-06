@@ -1,12 +1,13 @@
 name: Publish to npm
 
-# Tag-driven release: `git tag v0.1.2 && git push origin v0.1.2` publishes.
-# Publishing uses npm trusted publishing (OIDC) instead of a long-lived
-# NPM_TOKEN secret: the run exchanges a short-lived id-token for a
-# publish-only credential, so there is no repo secret to leak or rotate.
-# One-time setup on npmjs.com: package → Settings → Trusted publishing →
-# GitHub Actions, with Organization or user `Crosery`, Repository `shaleme`,
-# Workflow filename `publish.yml`.
+# Tag-driven release: `git tag v0.1.4 && git push origin v0.1.4` publishes.
+# Publishing uses npm trusted publishing (OIDC): the run exchanges a short-lived
+# id-token for a publish-only credential, so there is no repo secret to leak or
+# rotate. Trust is already established (npm trust list shaleme):
+#   provider github, repo Crosery/shaleme, file publish.yml, allow-publish.
+# The FIRST publish of a package can never use OIDC (the trust hangs off an
+# existing package), which is why 0.1.3 went out via local `npm publish
+# --auth-type=web`. See docs/npm-publish-sop.md before anything here changes.
 on:
   push:
     tags:
@@ -37,4 +38,8 @@ jobs:
           package-manager-cache: false # never cache in release builds
 
       - name: Publish to npm
-        run: npm publish --access public --provenance
+        # OIDC needs npm >= 11.5.1; node 24 bundles a newer one, but pin
+        # explicitly so a runner image change cannot downgrade us silently.
+        run: |
+          npm --version | grep -q '^1[1-9]\.' || npm i -g npm@latest
+          npm publish --access public --provenance

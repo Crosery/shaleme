@@ -1,6 +1,6 @@
 {
   "name": "shaleme",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "傻了么 (shaleme) - 统计主流 Coding Agent (Codex, Claude Code, Pi, CodeBuddy, OMP, Cline, OpenClaw, Hermes...) 中各模型说过「你说得对」的流口水排行榜与谄媚指数",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
