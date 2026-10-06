@@ -12,12 +12,14 @@ export function getDownloadsDir(): string {
   }
   return home;
 }
-
+export const DEFAULT_LEADERBOARD_ENDPOINT = 'https://shaleme.crosery.cc.cd/submit';
 export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?: string): string {
   const serialized = JSON.stringify(summary).replace(/</g, '\\u003c');
-  // Empty string means "no leaderboard configured": the report still offers
-  // JSON export, and the submit button explains that instead of failing.
-  const endpoint = leaderboardEndpoint ?? process.env.SHALEME_LEADERBOARD_URL ?? '';
+  // Like maleme's built-in submit_endpoint: the hosted leaderboard is the
+  // default target, so a plain `npx shaleme` run can upload directly.
+  // `--leaderboard ""` or SHALEME_LEADERBOARD_URL="" disables it; a non-empty
+  // value overrides it (self-hosted instances).
+  const endpoint = leaderboardEndpoint ?? process.env.SHALEME_LEADERBOARD_URL ?? DEFAULT_LEADERBOARD_ENDPOINT;
 
   // Featured models for top tier showcase
   const top1 = summary.modelRankings[0];

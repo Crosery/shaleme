@@ -42,7 +42,7 @@ ${c.bold('选项:')}
   --harness <names>  限定分析特定的 Agent Harness (逗号分隔，如 claude,codex,omp,pi)
   --jobs <n>         并行扫描的工作线程数 (默认: CPU 核数 - 1，上限 8)
   --no-parallel      禁用并行扫描，单线程运行 (等同于 --jobs 1)
-  --leaderboard <url> 报告页「上传到榜单」的提交地址 (默认读 SHALEME_LEADERBOARD_URL)
+  --leaderboard <url> 报告页「上传到榜单」的提交地址 (默认官方榜单 https://shaleme.crosery.cc.cd/submit，传 "" 禁用)
   --help, -h         显示帮助信息
   --version, -v      显示版本号
 
@@ -62,7 +62,7 @@ ${c.bold('支持的 Agent 平台:')}
   }
 
   if (args.includes('--version') || args.includes('-v')) {
-    console.log('shaleme v0.1.2');
+    console.log('shaleme v0.1.3');
     process.exit(0);
   }
 
@@ -91,7 +91,8 @@ ${c.bold('支持的 Agent 平台:')}
 
   let leaderboardUrl: string | undefined;
   const lbIdx = args.indexOf('--leaderboard');
-  if (lbIdx !== -1 && args[lbIdx + 1] && !args[lbIdx + 1].startsWith('--')) {
+  if (lbIdx !== -1 && args[lbIdx + 1] !== undefined && !args[lbIdx + 1].startsWith('--')) {
+    // Empty string is meaningful: it disables the default hosted leaderboard.
     leaderboardUrl = args[lbIdx + 1];
   }
 

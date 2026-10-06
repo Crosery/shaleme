@@ -1827,7 +1827,7 @@ async function runUnifiedScan(options = {}, detector = new SycophancyDetector) {
     stats,
     harnessStats,
     activeHarnessCount,
-    version: "0.1.2"
+    version: "0.1.3"
   });
 }
 // src/report/generator.ts
@@ -1842,9 +1842,10 @@ function getDownloadsDir() {
   }
   return home;
 }
+var DEFAULT_LEADERBOARD_ENDPOINT = "https://shaleme.crosery.cc.cd/submit";
 function generateReportHtml(summary, leaderboardEndpoint) {
   const serialized = JSON.stringify(summary).replace(/</g, "\\u003c");
-  const endpoint = leaderboardEndpoint ?? process.env.SHALEME_LEADERBOARD_URL ?? "";
+  const endpoint = leaderboardEndpoint ?? process.env.SHALEME_LEADERBOARD_URL ?? DEFAULT_LEADERBOARD_ENDPOINT;
   const top1 = summary.modelRankings[0];
   const top2 = summary.modelRankings[1];
   const top3 = summary.modelRankings[2];
@@ -3051,7 +3052,7 @@ ${c.bold("选项:")}
   --harness <names>  限定分析特定的 Agent Harness (逗号分隔，如 claude,codex,omp,pi)
   --jobs <n>         并行扫描的工作线程数 (默认: CPU 核数 - 1，上限 8)
   --no-parallel      禁用并行扫描，单线程运行 (等同于 --jobs 1)
-  --leaderboard <url> 报告页「上传到榜单」的提交地址 (默认读 SHALEME_LEADERBOARD_URL)
+  --leaderboard <url> 报告页「上传到榜单」的提交地址 (默认官方榜单 https://shaleme.crosery.cc.cd/submit，传 "" 禁用)
   --help, -h         显示帮助信息
   --version, -v      显示版本号
 
@@ -3070,7 +3071,7 @@ ${c.bold("支持的 Agent 平台:")}
     process.exit(0);
   }
   if (args.includes("--version") || args.includes("-v")) {
-    console.log("shaleme v0.1.2");
+    console.log("shaleme v0.1.3");
     process.exit(0);
   }
   const isJson = args.includes("--json");
@@ -3096,7 +3097,7 @@ ${c.bold("支持的 Agent 平台:")}
     jobs = 1;
   let leaderboardUrl;
   const lbIdx = args.indexOf("--leaderboard");
-  if (lbIdx !== -1 && args[lbIdx + 1] && !args[lbIdx + 1].startsWith("--")) {
+  if (lbIdx !== -1 && args[lbIdx + 1] !== undefined && !args[lbIdx + 1].startsWith("--")) {
     leaderboardUrl = args[lbIdx + 1];
   }
   if (!isJson) {
@@ -3224,6 +3225,7 @@ export {
   OmpAdapter,
   HermesAdapter,
   DEFAULT_LEXICON_RAW,
+  DEFAULT_LEADERBOARD_ENDPOINT,
   CursorAdapter,
   CodexAdapter,
   CodeBuddyAdapter,

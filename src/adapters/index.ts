@@ -154,6 +154,6 @@ export async function runUnifiedScan(
     stats,
     harnessStats,
     activeHarnessCount,
-    version: '0.1.2',
+    version: '0.1.3',
   });
 }

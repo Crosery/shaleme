@@ -73,8 +73,8 @@ bunx shaleme
 - [支持的 Agent 矩阵](#支持的-agent-矩阵)
 - [什么是模型流口水指数 (MDI)](#什么是模型流口水指数-mdi)
 - [报告功能演示](#报告功能演示)
-- [CLI 参数选项](#cli-参数选项)
 - [项目架构](#项目架构)
+- [npm 发布流程](#npm-发布流程)
 - [开源协议](#开源协议)
 
 ---
@@ -102,34 +102,24 @@ npx shaleme
 bunx shaleme
 ```
 
-> **暂时建议从 GitHub 直接运行**（见下方「关于 npm 版本」）：
->
-> ```bash
-> npx github:Crosery/shaleme
-> bunx github:Crosery/shaleme
-> ```
+官方 npm 包已恢复发布（0.1.0 因正则元字符崩溃缺陷已被 unpublish，永久烧号不可复用）。
+从 0.1.3 起 registry 版本即为最新，直接 `npx shaleme` 即可。
 
-### 关于 npm 版本
+### 官方榜单：流口水琅琊榜
 
-registry 上当前是 **0.1.0**，它有一个已知崩溃缺陷：当命中包含 `**` 等正则元字符的
-短语时（例如 `你说一句 **continue** 我就`），生成 HTML 报告会抛
-`SyntaxError: Invalid regular expression ... Nothing to repeat`，整份报告无法产出。
+`npx shaleme` 生成的报告页自带 **「上传到榜单」** 按钮，直接提交到官方榜单：
 
-修复已在仓库里（`main`，v0.1.2），但**尚未发布到 registry**，因此在那之前请用
-GitHub 渠道安装，它自带已修复的构建产物：
+**<https://shaleme.crosery.cc.cd>**
+
+无需任何配置。点击按钮 → GitHub 登录授权 → 成绩按 GitHub 账号上榜，
+支持总榜、模型榜和个人主页（`/u/<login>`）。提交载荷只有汇总计数（见
+[成绩导出与榜单提交](#成绩导出与榜单提交) 的隐私边界），想传到自建榜单
+或完全不传，用 `--leaderboard` 覆盖或置空：
 
 ```bash
-npx github:Crosery/shaleme
+npx shaleme --leaderboard https://your-leaderboard.example.com/submit  # 自建
+npx shaleme --leaderboard ""                                           # 不上传
 ```
-
-0.1.2 相对 0.1.0 的差异：
-
-| | 0.1.0（registry） | 0.1.2（仓库） |
-| :--- | :--- | :--- |
-| 含正则元字符的短语 | **崩溃，出不了报告** | 正常 |
-| 扫描耗时（本机 2,256 个会话文件） | ~19s | ~4s（多核并行） |
-| 会话数统计 | 少算（并行路径未计入） | 正确 |
-| 榜单排名顺序 | 可能随运行变化 | 确定 |
 
 ### 2. 全局安装：
 
@@ -271,16 +261,19 @@ TOP 5 附和榜首模型:
 报告底部提供两个按钮：
 
 - **导出成绩 JSON**：把本次统计导出成 `shaleme-score.json`，可手动上传到任何榜单；
-- **上传到榜单**：POST 到指定榜单地址（未配置时按钮会提示先导出）。
+- **上传到榜单**：POST 到榜单地址。**默认烧入官方榜单
+  `https://shaleme.crosery.cc.cd/submit`**（与 maleme 一样开箱即传），
+  未登录时会先跳 GitHub 授权、授权回来自动补交。
 
 **隐私边界**：分析全程在本机完成。提交载荷**只含汇总计数**（模型名、命中次数、
 消息条数、MDI、会话数），**不含任何对话正文、引用片段、会话 ID 或文件路径**。
 测试里有断言卡住这一点，防止将来被顺手改宽。
 
-配置榜单地址：
+覆盖榜单地址（自建或禁用）：
 
 ```bash
-npx shaleme --leaderboard https://your-leaderboard.example.com/submit
+npx shaleme --leaderboard https://your-leaderboard.example.com/submit  # 自建
+npx shaleme --leaderboard ""                                           # 不上传
 # 或
 export SHALEME_LEADERBOARD_URL=https://your-leaderboard.example.com/submit
 ```
@@ -300,7 +293,7 @@ export SHALEME_LEADERBOARD_URL=https://your-leaderboard.example.com/submit
   --harness <names>  限定分析特定的 Agent Harness (逗号分隔，如 claude,codex,omp,pi)
   --jobs <n>         并行扫描的工作线程数 (默认: CPU 核数 - 1，上限 8)
   --no-parallel      禁用并行扫描，单线程运行 (等同于 --jobs 1)
-  --leaderboard <url> 报告页「上传到榜单」的提交地址 (默认读 SHALEME_LEADERBOARD_URL)
+  --leaderboard <url> 报告页「上传到榜单」的提交地址 (默认官方榜单 https://shaleme.crosery.cc.cd/submit，传 "" 禁用)
   --help, -h         显示帮助信息
   --version, -v      显示版本号
 ```
@@ -354,6 +347,18 @@ shaleme/
 │   ├── io-concurrency.ts     # 读取方式与并发对比
 │   └── worker-scaling.ts     # worker 并行扩展性
 └── tests/                    # 单元测试集
+```
+
+---
+
+## npm 发布流程
+
+发版走 tag → GitHub Actions → npm Trusted Publishing (OIDC)，全程无需 token 或 OTP。
+完整检查清单与三轮翻车的教训（恢复码≠OTP、unpublish 烧号 24h 冷却、OIDC 首发鸡生蛋问题）
+见 [docs/npm-publish-sop.md](docs/npm-publish-sop.md)。
+
+```bash
+git tag v0.1.4 && git push origin refs/tags/v0.1.4   # 就这一步
 ```
 
 ---

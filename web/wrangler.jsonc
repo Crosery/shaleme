@@ -4,18 +4,17 @@
   "main": "@astrojs/cloudflare/entrypoints/server",
   "compatibility_date": "2026-04-13",
   "compatibility_flags": ["nodejs_compat"],
-  // workers.dev stays enabled so the first deploy works before a domain exists.
-  // Switch to false and add a routes block once a custom domain is attached.
-  "workers_dev": true,
+  // The leaderboard is served from the custom domain; workers.dev is disabled so
+  // OAuth sees exactly one canonical origin.
+  "workers_dev": false,
+  "routes": [{ "pattern": "shaleme.crosery.cc.cd", "custom_domain": true }],
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist"
   },
   "vars": {
-    // Empty means "use the origin of the incoming request", which is correct for
-    // both workers.dev and a custom domain. Set it explicitly once the canonical
-    // origin is fixed; see README "配置 APP_URL".
-    "APP_URL": ""
+    // Canonical origin for the GitHub OAuth redirect_uri.
+    "APP_URL": "https://shaleme.crosery.cc.cd"
   },
   "observability": {
     "enabled": true
@@ -24,8 +23,7 @@
     {
       "binding": "DB",
       "database_name": "shaleme-leaderboard",
-      // Replace with the id printed by `wrangler d1 create shaleme-leaderboard`.
-      "database_id": "replace-with-your-d1-database-id"
+      "database_id": "3e213812-1cfd-494f-ab41-28a8910befc8"
     }
   ]
 }

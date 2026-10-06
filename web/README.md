@@ -6,7 +6,17 @@
 技术栈：Astro（`output: "server"`）+ `@astrojs/cloudflare` + Cloudflare Workers +
 D1 + GitHub OAuth。没有前端框架，没有客户端状态，页面全部服务端渲染。
 
----
+
+## 官方实例状态（2026-10-07）
+
+| 项 | 值 |
+| --- | --- |
+| 地址 | <https://shaleme.crosery.cc.cd>（CLI 默认烧入 `/submit`） |
+| Worker / D1 | `shaleme-leaderboard`，`database_id = 3e213812-1cfd-494f-ab41-28a8910befc8`，迁移已应用 |
+| 域名 | zone `crosery.cc.cd`，`routes` 里 `custom_domain: true`，`workers_dev: false`，`APP_URL = https://shaleme.crosery.cc.cd` |
+| 部署方式 | 本地 `wrangler login` + `npm run deploy`（账号 `2022003007@yangtzeu.edu.cn's Account`） |
+| 待办 | GitHub OAuth App 还没建：`GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` / `SESSION_SECRET` 三个 secret 未写入，所以点「上传到榜单」目前会跳回首页提示「登录未配置」。按下面第 4、6 步补齐即可。 |
+
 
 ## 目录结构
 
@@ -182,8 +192,8 @@ npx wrangler d1 create shaleme-leaderboard
 | 字段 | 值 |
 | --- | --- |
 | Application name | 任意，例如 `shaleme leaderboard` |
-| Homepage URL | 你的站点根地址，例如 `https://shaleme.example.com` |
-| Authorization callback URL | **`https://shaleme.example.com/api/auth/github/callback`** |
+| Homepage URL | `https://shaleme.crosery.cc.cd` |
+| Authorization callback URL | **`https://shaleme.crosery.cc.cd/api/auth/github/callback`** |
 
 回调地址必须是 `<APP_URL>/api/auth/github/callback`，一字不差，否则 GitHub 会拒绝
 授权并报 redirect_uri 不匹配。本地开发另建一个 OAuth App，回调填
@@ -206,9 +216,8 @@ npx wrangler d1 create shaleme-leaderboard
 }
 ```
 
-> **注意**：`workers_dev` 目前是 `true`，方便没有域名时先跑起来。绑好自定义域名后
-> 改成 `false` 并加上 `routes` 段，否则 Worker 会同时挂在两个域名上，
-> 而 OAuth 只认其中一个回调地址。
+> **注意**：官方实例已按此配置：`workers_dev: false` + `routes` 里的
+> `shaleme.crosery.cc.cd` 自定义域名，`APP_URL` 已写死在 `wrangler.jsonc`。
 
 ### 第 6 步：写入密钥
 
@@ -252,6 +261,9 @@ npm run deploy        # = astro build && wrangler deploy
 
 ### 第 9 步：让 CLI 指向它
 
+官方实例无需任何参数：CLI 从 0.1.3 起默认烧入
+`https://shaleme.crosery.cc.cd/submit`。自建实例时：
+
 ```bash
 npx shaleme --leaderboard https://shaleme.example.com/submit
 ```
@@ -291,11 +303,10 @@ npm run dev                        # http://127.0.0.1:4321
 
 ## 已知边界
 
-- **未在真实 Cloudflare 账号上部署验证过。** 本目录是脚手架：源码级校验只做了
-  类型检查（`tsc --strict` 对全部 `.ts` 与全部 `.astro` frontmatter 通过）和
-  SQL 语法/语义校验（迁移在 sqlite3 上建表成功，排名与单模型排名查询用种子数据验证过
-  排序正确）。`astro build`、`wrangler deploy`、真实 OAuth 往返都没有跑过，
-  因为环境里不允许安装依赖。
+- **已部署到真实 Cloudflare 账号并验证**（见顶部「官方实例状态」）：
+  `astro build`、`wrangler d1 migrations apply --remote`、`wrangler deploy`、
+  首页/模型榜/`/submit` 的 payload 校验与 pending 重定向路径都用 curl 实测过。
+  唯一没跑过的是**真实 GitHub OAuth 往返**（OAuth App 还没建，secret 未写入）。
 - 依赖版本按 2026-09-29 的 npm registry 现状声明：`astro ^6.4.8`、
   `@astrojs/cloudflare ^13.7.0`（peer 要求 `astro ^6.3.0` + `wrangler ^4.83.0`）、
   `wrangler ^4.143.0`。**注意 npm 上的 `latest` 已经是 Astro 7 + 适配器 14.x**，
