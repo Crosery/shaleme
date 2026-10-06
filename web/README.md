@@ -15,7 +15,7 @@ D1 + GitHub OAuth。没有前端框架，没有客户端状态，页面全部服
 | Worker / D1 | `shaleme-leaderboard`，`database_id = 3e213812-1cfd-494f-ab41-28a8910befc8`，迁移已应用 |
 | 域名 | zone `crosery.cc.cd`，`routes` 里 `custom_domain: true`，`workers_dev: false`，`APP_URL = https://shaleme.crosery.cc.cd` |
 | 部署方式 | 本地 `wrangler login` + `npm run deploy`（账号 `2022003007@yangtzeu.edu.cn's Account`） |
-| 密钥 | `SESSION_SECRET` 已写入（`wrangler secret put`）。**待办：GitHub OAuth App 还没建，`GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` 未写入**，所以点「上传到榜单」目前会跳回首页提示「登录未配置」。按下面第 4、6 步补齐即可（只有这两步需要人工）。 |
+| 密钥 | `SESSION_SECRET`、`GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET` 三个 secret 均已 `wrangler secret put` 写入（OAuth App id `3909756`，回调 `https://shaleme.crosery.cc.cd/api/auth/github/callback`）。端到端已实测：报告页表单 POST `/submit` → GitHub 授权 → 回调消费 pending token → 落榜显示名次。 |
 
 
 ## 目录结构
