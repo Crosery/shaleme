@@ -358,7 +358,7 @@ shaleme/
 见 [docs/npm-publish-sop.md](docs/npm-publish-sop.md)。
 
 ```bash
-git tag v0.1.4 && git push origin refs/tags/v0.1.4   # 就这一步
+git tag v0.1.5 && git push origin refs/tags/v0.1.5   # 就这一步
 ```
 
 ---

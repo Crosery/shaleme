@@ -28,11 +28,11 @@
   自动走了 staged publishing：先落一个 `0.0.0-stage` 占位版本，真正的 0.1.3 在
   registry 处理完占位后入库；期间盲目重试会得到 `409 Failed to save packument`，
   正确做法是等一两分钟再查 `npm view shaleme version`，别连点）。
-- Trusted publisher 已用 CLI 建立（无需去网页）：
+- Trusted publisher 已建立并完成首次 CI 验证发布（0.1.4，workflow 37500943694，
+  provenance 进 sigstore 透明日志，`npm view shaleme@0.1.4` 可查 attestation），
+  trust 已绑定仓库不可变身份、不会过期。重建命令（备用）：
   `npm trust github shaleme --repo Crosery/shaleme --file publish.yml --allow-publish --auth-type=web`
   验证：`npm trust list shaleme` → permissions: publish, stage publish。
-  **注意：trust 建立后 2 天内必须完成首次 CI 发布**（10-09 前推 `v0.1.4`），
-  否则过期需重建。
 - 之后发版的唯一入口：`.github/workflows/publish.yml`，唯一触发条件：`v*` tag push。
   只 push `main` 不会发包。
 
