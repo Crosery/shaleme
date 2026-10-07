@@ -21,6 +21,29 @@ const maxHarnessScore = dashboard.hottestHarnesses.length > 0 ? dashboard.hottes
 function fmt(value: number) {
   return value.toLocaleString('en-US');
 }
+
+// 上传时间按东八区显示，和榜单用户所在时区一致。
+const timeFmt = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  'month': '2-digit',
+  'day': '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+const fullTimeFmt = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  'year': 'numeric',
+  'month': '2-digit',
+  'day': '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  'second': '2-digit',
+  hour12: false,
+});
+function fmtTime(value: number) {
+  return value ? timeFmt.format(new Date(value)) : '-';
+}
 ---
 
 <BaseLayout
@@ -92,6 +115,9 @@ function fmt(value: number) {
                           分数
                         </span>
                       </th>
+                      <th class="right">
+                        <span data-tip="最近一次上传到榜单的时间（东八区）">上传时间</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -119,6 +145,9 @@ function fmt(value: number) {
                             <span class="tier" style={`color:${tier.color};`}>
                               {tier.badge}
                             </span>
+                          </td>
+                          <td class="right num muted" data-tip={`上传于 ${fullTimeFmt.format(new Date(entry.updatedAt))}`}>
+                            {fmtTime(entry.updatedAt)}
                           </td>
                         </tr>
                       );
