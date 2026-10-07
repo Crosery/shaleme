@@ -43,8 +43,8 @@ describe('report rendering with a real-world phrase', () => {
 
   it('renders and highlights it instead of throwing', () => {
     const html = generateReportHtml(summaryWith(phrase, `好的，${phrase}`));
-    expect(html).toContain('CASE CITATIONS');
     expect(html).toContain('<span class="quote-target">');
+    expect(html).toContain('continue');
   });
 
   it('renders phrases holding HTML and regex syntax at once', () => {

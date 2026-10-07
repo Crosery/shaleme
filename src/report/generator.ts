@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ReportSummary } from '../types';
+import { DroolMatch, ModelStats, ReportSummary } from '../types';
 import { escapeHtml, escapeRegex } from '../utils/text';
 
 export function getDownloadsDir(): string {
@@ -13,6 +13,66 @@ export function getDownloadsDir(): string {
   return home;
 }
 export const DEFAULT_LEADERBOARD_ENDPOINT = 'https://shaleme.crosery.cc.cd/submit';
+
+const ACCENT = '#4f46e5';
+const LINE = '#e4e7ec';
+
+function loadMascotDataUri(): string {
+  const candidates = [
+    path.join(__dirname, '..', 'data', 'mascot.jpg'),
+    path.join(__dirname, '..', '..', 'data', 'mascot.jpg'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return `data:image/jpeg;base64,${fs.readFileSync(candidate).toString('base64')}`;
+    }
+  }
+  return '';
+}
+
+function modelRow(m: ModelStats, rank: number, maxMdi: number): string {
+  const rankStr = String(rank).padStart(2, '0');
+  const topP = m.topPhrases[0]?.phrase || '无';
+  const barWidth = Math.min(100, Math.round((m.droolIndex / maxMdi) * 100));
+  return `
+          <tr data-model="${escapeHtml(m.model.toLowerCase())}" data-sort-rank="${rank}" data-sort-mdi="${m.droolIndex}" data-sort-count="${m.droolCount}" data-sort-total="${m.totalMessages}" data-sort-rate="${m.droolRate}">
+            <td class="col-rank num">${rankStr}</td>
+            <td class="col-model">${escapeHtml(m.model)}</td>
+            <td class="col-harness num">${m.harnesses.map(escapeHtml).join(', ')}</td>
+            <td class="num strong right">${m.droolCount.toLocaleString()}</td>
+            <td class="num muted right">${m.totalMessages.toLocaleString()}</td>
+            <td class="num right">${m.droolRate}%</td>
+            <td class="col-mdi">
+              <span class="num strong">${m.droolIndex} ‰</span>
+              <span class="mdi-bar"><span class="mdi-fill" style="width:${barWidth}%; background:${m.droolLevel.color};"></span></span>
+            </td>
+            <td class="col-level" style="color:${m.droolLevel.color}">${escapeHtml(m.droolLevel.name)}</td>
+            <td class="col-phrase">「${escapeHtml(topP)}」</td>
+          </tr>`;
+}
+
+function quoteCard(match: DroolMatch): string {
+  const escapedText = escapeHtml(match.snippet);
+  const safePhrasePattern = escapeRegex(escapeHtml(match.phrase));
+  let highlighted = escapedText;
+  try {
+    highlighted = escapedText.replace(
+      new RegExp(safePhrasePattern, 'gi'),
+      `<span class="quote-target">$&</span>`,
+    );
+  } catch {
+    // Fall back to the unhighlighted snippet when the phrase can't become a regex.
+  }
+  return `
+        <article class="quote-card" data-phrase="${escapeHtml(match.phrase.toLowerCase())}">
+          <p class="quote-body">${highlighted}</p>
+          <footer class="quote-foot">
+            <span class="quote-model">${escapeHtml(match.model)} · ${escapeHtml(match.harness)}</span>
+            <span class="num">${new Date(match.timestamp).toLocaleDateString()}</span>
+          </footer>
+        </article>`;
+}
+
 export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?: string): string {
   const serialized = JSON.stringify(summary).replace(/</g, '\\u003c');
   // Like maleme's built-in submit_endpoint: the hosted leaderboard is the
@@ -21,25 +81,29 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
   // value overrides it (self-hosted instances).
   const endpoint = leaderboardEndpoint ?? process.env.SHALEME_LEADERBOARD_URL ?? DEFAULT_LEADERBOARD_ENDPOINT;
 
-  // Featured models for top tier showcase
-  const top1 = summary.modelRankings[0];
-  const top2 = summary.modelRankings[1];
-  const top3 = summary.modelRankings[2];
+  const mascotDataUri = loadMascotDataUri();
+  const mascotImg = mascotDataUri
+    ? `<img class="masthead-mascot" src="${mascotDataUri}" alt="DeepSeek娘：漩涡眼流口水的 Q 版形象">`
+    : '';
+  const maxMdi = Math.max(...summary.modelRankings.map((r) => r.droolIndex), 1);
+  const harnessRows = Object.values(summary.harnessStats).filter((h) => h.messageCount > 0);
+  const maxHarnessMdi = Math.max(...harnessRows.map((h) => h.droolIndex), 1);
 
   // Build SVG timeline chart
   const timelinePoints = summary.dailyTimeline;
-  let timelineSvg = '<div class="no-data">暂无时间线数据</div>';
+  let timelineSvg = '<p class="no-data">暂无时间线数据</p>';
   if (timelinePoints.length > 0) {
     const maxCount = Math.max(...timelinePoints.map((p) => p.count), 1);
     const width = 800;
-    const height = 220;
-    const padding = 40;
-    const chartW = width - padding * 2;
-    const chartH = height - padding * 2;
+    const height = 240;
+    const paddingX = 28;
+    const paddingY = 24;
+    const chartW = width - paddingX * 2;
+    const chartH = height - paddingY * 2;
 
     const pointsCoords = timelinePoints.map((p, idx) => {
-      const x = padding + (idx / Math.max(timelinePoints.length - 1, 1)) * chartW;
-      const y = height - padding - (p.count / maxCount) * chartH;
+      const x = paddingX + (idx / Math.max(timelinePoints.length - 1, 1)) * chartW;
+      const y = height - paddingY - (p.count / maxCount) * chartH;
       return { x, y, ...p };
     });
 
@@ -47,46 +111,59 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
       return idx === 0 ? `M ${curr.x} ${curr.y}` : `${acc} L ${curr.x} ${curr.y}`;
     }, '');
 
-    const areaData =
-      pointsCoords.length > 0
-        ? `${pathData} L ${pointsCoords[pointsCoords.length - 1].x} ${height - padding} L ${pointsCoords[0].x} ${height - padding} Z`
-        : '';
+    const areaData = `${pathData} L ${pointsCoords[pointsCoords.length - 1].x} ${height - paddingY} L ${pointsCoords[0].x} ${height - paddingY} Z`;
 
     timelineSvg = `
-      <svg viewBox="0 0 ${width} ${height}" class="timeline-svg" preserveAspectRatio="none">
+      <svg viewBox="0 0 ${width} ${height}" class="timeline-svg" role="img" aria-label="每日「你说得对」命中次数折线图">
         <defs>
-          <linearGradient id="areaGradientLight" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.18" />
-            <stop offset="100%" stop-color="#4f46e5" stop-opacity="0.0" />
+          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${ACCENT}" stop-opacity="0.14" />
+            <stop offset="100%" stop-color="${ACCENT}" stop-opacity="0.01" />
           </linearGradient>
         </defs>
-        <!-- Horizontal grid lines -->
-        <line x1="${padding}" y1="${padding}" x2="${width - padding}" y2="${padding}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4" />
-        <line x1="${padding}" y1="${padding + chartH / 2}" x2="${width - padding}" y2="${padding + chartH / 2}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4" />
-        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#cbd5e1" stroke-width="1.5" />
+        <line x1="${paddingX}" y1="${height - paddingY}" x2="${width - paddingX}" y2="${height - paddingY}" stroke="${LINE}" stroke-width="1.5" />
 
-        <!-- Area & line -->
-        <path d="${areaData}" fill="url(#areaGradientLight)" />
-        <path d="${pathData}" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="${areaData}" fill="url(#areaGradient)" />
+        <path d="${pathData}" fill="none" stroke="${ACCENT}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
 
-        <!-- Points -->
         ${pointsCoords
           .map(
             (pt) => `
-          <circle cx="${pt.x}" cy="${pt.y}" r="4" fill="#ffffff" stroke="#4f46e5" stroke-width="2.5">
-            <title>${pt.date}: ${pt.count} 次「你说得对」</title>
-          </circle>
-        `,
+          <circle class="tl-point" cx="${pt.x}" cy="${pt.y}" r="3" fill="#ffffff" stroke="${ACCENT}" stroke-width="2" data-date="${pt.date}" data-count="${pt.count}" />`,
           )
           .join('')}
       </svg>
       <div class="timeline-labels">
-        <span>${timelinePoints[0]?.date || ''}</span>
-        <span>共 ${timelinePoints.length} 个样本观察日</span>
-        <span>${timelinePoints[timelinePoints.length - 1]?.date || ''}</span>
+        <span class="num">${timelinePoints[0]?.date || ''}</span>
+        <span class="num">${timelinePoints[timelinePoints.length - 1]?.date || ''}</span>
       </div>
+      <div class="chart-tooltip" id="chartTooltip" hidden></div>
     `;
   }
+
+  const modelRowsHtml = summary.modelRankings.map((m, idx) => modelRow(m, idx + 1, maxMdi)).join('');
+  const harnessRowsHtml = harnessRows
+    .map((h) => {
+      const w = Math.min(100, Math.round((h.droolIndex / maxHarnessMdi) * 100));
+      return `
+        <li class="harness-row">
+          <span class="harness-name">${escapeHtml(h.name)}</span>
+          <span class="harness-track"><span class="harness-fill" style="width:${w}%;"></span></span>
+          <span class="harness-num num">${h.droolIndex} ‰</span>
+          <span class="harness-count num">${h.droolCount} / ${h.messageCount.toLocaleString()}</span>
+        </li>`;
+    })
+    .join('');
+  const phraseChipsHtml = summary.phraseCloud
+    .map(
+      (p) => `
+          <button type="button" class="phrase-chip" data-phrase="${escapeHtml(p.text.toLowerCase())}" aria-pressed="false">
+            <span class="phrase-text">${escapeHtml(p.text)}</span>
+            <span class="phrase-count num">${p.count}</span>
+          </button>`,
+    )
+    .join('');
+  const quoteCardsHtml = summary.hallOfShame.map(quoteCard).join('');
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -94,925 +171,879 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SHALEME - AI 模型「你说得对」行为基准分析报告</title>
+  <meta name="description" content="扫描本机 Coding Agent 历史会话，量化各模型的顺从附和倾向（MDI 流口水指数）。">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-size='18' font-weight='700' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E">
   <style>
     :root {
-      --bg: #f8fafc;
-      --bg-surface: #ffffff;
-      --bg-subtle: #f1f5f9;
-      --border: #e2e8f0;
-      --border-strong: #cbd5e1;
-      --text: #0f172a;
-      --text-secondary: #475569;
-      --text-muted: #64748b;
-      --primary: #4f46e5;
-      --primary-subtle: #eef2ff;
-      --amber: #d97706;
-      --amber-subtle: #fef3c7;
-      --emerald: #059669;
-      --emerald-subtle: #ecfdf5;
-      --rose: #e11d48;
-      --rose-subtle: #ffe4e6;
-      --radius: 10px;
-      --radius-sm: 6px;
-      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.05);
-      --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.03);
+      /* color roles */
+      --bg: #fafbfc;
+      --surface: #ffffff;
+      --surface-2: #f2f4f7;
+      --line: ${LINE};
+      --line-strong: #c9cfd8;
+      --ink: #16181d;
+      --ink-2: #4b5563;
+      --ink-3: #8b93a1;
+      --accent: ${ACCENT};
+      --accent-strong: #4338ca;
+      --accent-soft: #eef0fe;
+      --danger: #be123c;
+      --danger-soft: #ffe4e6;
+      --success: #047857;
+
+      /* type scale (1.25 ratio) */
+      --fs-xs: 0.78rem;
+      --fs-sm: 0.83rem;
+      --fs-md: 0.89rem;
+      --fs-base: 1rem;
+      --fs-lg: 1.22rem;
+      --fs-xl: 1.55rem;
+      --fs-2xl: 2.05rem;
+      --fs-3xl: clamp(1.75rem, 3.6vw, 2.5rem);
+
+      /* spacing scale (4px rhythm) */
+      --s-1: 4px;
+      --s-2: 8px;
+      --s-3: 12px;
+      --s-4: 16px;
+      --s-5: 24px;
+      --s-6: 32px;
+      --s-7: 48px;
+      --s-8: 64px;
+
+      /* shape + elevation */
+      --r-control: 8px;
+      --r-field: 10px;
+
+      /* motion */
+      --dur-fast: 0.14s;
+      --dur-med: 0.2s;
+      --dur-slow: 0.28s;
+      --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+      --font-serif: "Songti SC", "Noto Serif SC", "STSong", Georgia, serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
     body {
       background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-      line-height: 1.5;
-      padding: 40px 24px 100px;
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.7;
+      padding: 0 24px 96px;
       -webkit-font-smoothing: antialiased;
     }
 
-    .container {
-      max-width: 1140px;
-      margin: 0 auto;
+    .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+    .strong { font-weight: 700; color: var(--ink); }
+    .muted { color: var(--ink-3); }
+    .right { text-align: right; }
+
+    .container { max-width: 1080px; margin: 0 auto; }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 4px;
     }
 
-    /* Top Brand & Header */
-    header {
-      margin-bottom: 32px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 24px;
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
     }
-    .brand-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--primary);
-      background: var(--primary-subtle);
-      padding: 4px 12px;
-      border-radius: var(--radius-sm);
-      margin-bottom: 12px;
+
+    /* ---------- Masthead ---------- */
+    .masthead {
+      padding: 52px 0 36px;
+      border-bottom: 1px solid var(--line);
     }
-    h1 {
-      font-size: 2.2rem;
-      font-weight: 800;
-      color: var(--text);
-      letter-spacing: -0.02em;
-      margin-bottom: 8px;
-    }
-    .subtitle {
-      color: var(--text-secondary);
-      font-size: 1.05rem;
-      max-width: 760px;
-      line-height: 1.6;
-    }
-    .meta-row {
+    .brand-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 20px;
-      margin-top: 16px;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px 24px;
+      margin-bottom: 20px;
+    }
+    .brand {
+      font-family: var(--font-serif);
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+    .brand .sub {
+      font-family: var(--font-sans);
       font-size: 0.82rem;
-      color: var(--text-muted);
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 400;
+      letter-spacing: 0;
+      color: var(--ink-3);
+      margin-left: 10px;
+    }
+    .meta { font-size: 0.82rem; color: var(--ink-3); }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.75rem, 3.6vw, 2.5rem);
+      font-weight: 700;
+      line-height: 1.35;
+      letter-spacing: 0.01em;
+    }
+    h1 .hl { color: var(--accent-strong); }
+
+    .masthead-main {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--s-5);
+    }
+    .masthead-mascot {
+      width: 132px;
+      height: auto;
+      flex: none;
+      mix-blend-mode: multiply;
     }
 
-    /* Executive Metric Overview */
-    .metrics-grid {
+    /* ---------- Summary strip ---------- */
+    .summary {
       display: grid;
-      grid-template-columns: 1.4fr repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 36px;
+      grid-template-columns: 1.3fr repeat(3, 1fr);
+      gap: 0;
+      padding: 36px 0 8px;
     }
-    .metric-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 22px;
-      box-shadow: var(--shadow-sm);
+    .sum-item {
+      padding: 4px 28px;
+      border-left: 1px solid var(--line);
     }
-    .metric-card.highlight {
-      border-color: #cbd5e1;
-      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-      box-shadow: var(--shadow);
-    }
-    .metric-title {
-      font-size: 0.78rem;
+    .sum-item:first-child { padding-left: 0; border-left: none; }
+    .sum-label { display: block; font-size: 0.82rem; color: var(--ink-3); margin-bottom: 6px; }
+    .sum-value {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: 2.05rem;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-    }
-    .metric-value {
-      font-size: 2.1rem;
-      font-weight: 800;
-      color: var(--text);
+      line-height: 1.15;
       letter-spacing: -0.02em;
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
     }
-    .metric-value small {
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-    .metric-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 10px;
-      padding: 4px 10px;
-      border-radius: var(--radius-sm);
-      font-size: 0.8rem;
+    .sum-value small { font-family: var(--font-sans); font-size: 0.82rem; font-weight: 600; color: var(--ink-3); margin-left: 4px; letter-spacing: 0; }
+    .sum-verdict {
+      font-family: var(--font-serif);
+      font-size: 2.05rem;
       font-weight: 700;
+      line-height: 1.25;
     }
-    .metric-desc {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      margin-top: 8px;
-      line-height: 1.45;
-    }
+    .sum-note { display: block; margin-top: 4px; font-size: 0.82rem; color: var(--ink-3); }
 
-    /* Section Component */
-    .section-title-wrap {
+    /* ---------- Sections ---------- */
+    section { margin-top: 64px; }
+    .section-head {
       display: flex;
-      justify-content: space-between;
+      flex-wrap: wrap;
       align-items: baseline;
-      margin-bottom: 16px;
-      border-left: 3px solid var(--primary);
-      padding-left: 12px;
+      justify-content: space-between;
+      gap: 8px 24px;
+      margin-bottom: 18px;
     }
-    .section-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.01em;
-    }
-    .section-meta {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-    }
+    h2 { font-size: 1.22rem; font-weight: 700; letter-spacing: 0.01em; }
+    .section-meta { font-size: 0.82rem; color: var(--ink-3); }
 
-    /* Redesigned Showcase Grid: Top 3 */
-    .showcase-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 36px;
-    }
-    .showcase-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      box-shadow: var(--shadow);
+    /* ---------- Table ---------- */
+    .table-toolbar {
       display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      position: relative;
-    }
-    .showcase-card.rank-1 {
-      border-top: 4px solid var(--amber);
-      background: linear-gradient(180deg, #fffdf8 0%, #ffffff 50%);
-    }
-    .showcase-card.rank-2 {
-      border-top: 4px solid #64748b;
-    }
-    .showcase-card.rank-3 {
-      border-top: 4px solid #94a3b8;
-    }
-    .showcase-top {
-      display: flex;
-      justify-content: space-between;
+      flex-wrap: wrap;
       align-items: center;
+      justify-content: space-between;
+      gap: 12px 16px;
       margin-bottom: 14px;
     }
-    .rank-indicator {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.8rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      padding: 3px 8px;
-      border-radius: 4px;
-      background: var(--bg-subtle);
-      color: var(--text-secondary);
+    .segmented {
+      display: inline-flex;
+      gap: var(--s-1);
+      padding: var(--s-1);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r-field);
     }
-    .rank-1 .rank-indicator {
-      background: var(--amber-subtle);
-      color: var(--amber);
-    }
-    .showcase-model {
-      font-size: 1.2rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 12px;
-      word-break: break-all;
-    }
-    .showcase-stat-hero {
-      font-size: 1.8rem;
-      font-weight: 800;
-      color: var(--text);
-      display: flex;
-      align-items: baseline;
-      gap: 4px;
-      margin-bottom: 12px;
-    }
-    .showcase-stat-hero small {
-      font-size: 0.85rem;
+    .seg-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-2);
+      font-family: inherit;
+      font-size: var(--fs-sm);
       font-weight: 600;
-      color: var(--text-muted);
-    }
-    .showcase-details {
-      border-top: 1px solid var(--border);
-      padding-top: 12px;
-      margin-top: 12px;
-      font-size: 0.82rem;
-      color: var(--text-secondary);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .showcase-detail-row {
-      display: flex;
-      justify-content: space-between;
-    }
-
-    /* Benchmark Table */
-    .table-container {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-sm);
-      margin-bottom: 36px;
-      overflow: hidden;
-    }
-    .table-toolbar {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #fafafa;
-    }
-    .filter-tabs {
-      display: flex;
-      gap: 8px;
-    }
-    .filter-tab {
-      padding: 6px 14px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--bg-surface);
-      color: var(--text-secondary);
-      font-size: 0.82rem;
-      font-weight: 600;
+      padding: var(--s-2) 14px;
+      border-radius: var(--r-control);
       cursor: pointer;
-      transition: all 0.15s ease;
+      white-space: nowrap;
+      transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
     }
-    .filter-tab.active, .filter-tab:hover {
-      background: var(--text);
-      color: #fff;
-      border-color: var(--text);
-    }
+    .seg-btn:hover { background: var(--accent-soft); color: var(--accent-strong); }
+    .seg-btn:active { transform: scale(0.97); }
+    .seg-btn[aria-pressed="true"] { background: var(--ink); color: #fff; }
+    .seg-btn[aria-pressed="true"]:hover { background: #262b36; color: #fff; }
+    .seg-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .search-wrap { position: relative; display: flex; align-items: center; }
     .search-input {
-      border: 1px solid var(--border-strong);
-      padding: 8px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 0.85rem;
+      appearance: none;
       width: 260px;
-      background: #fff;
-      color: var(--text);
+      max-width: 100%;
+      padding: var(--s-3) 38px var(--s-3) 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-control);
+      background: var(--surface);
+      color: var(--ink);
+      font-family: inherit;
+      font-size: var(--fs-md);
+      transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
     }
+    .search-input::placeholder { color: var(--ink-3); }
+    .search-input:hover { border-color: var(--line-strong); }
     .search-input:focus {
       outline: none;
-      border-color: var(--primary);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
     }
+    .search-input:disabled { background: var(--surface-2); color: var(--ink-3); cursor: not-allowed; }
+    .search-clear {
+      position: absolute;
+      right: 6px;
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--ink-3);
+      font-size: 1.05rem;
+      line-height: 1;
+      cursor: pointer;
+      display: none;
+    }
+    .search-clear:hover { background: var(--accent-soft); color: var(--ink); }
+    .search-clear.show { display: block; }
+
+    .result-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 2px 10px;
+      font-size: 0.82rem;
+      color: var(--ink-3);
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
+      font-size: 0.89rem;
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--surface);
       text-align: left;
-      font-size: 0.88rem;
-    }
-    th {
-      background: #f8fafc;
-      padding: 12px 18px;
-      font-size: 0.74rem;
+      font-size: 0.76rem;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
+      color: var(--ink-3);
+      letter-spacing: 0.04em;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
     }
-    td {
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
+    thead.stuck th { box-shadow: 0 6px 12px -8px rgba(22, 24, 29, 0.16); }
+    th.right { text-align: right; }
+    .sort-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      font: inherit;
+      color: inherit;
+      letter-spacing: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 2px;
+      border-radius: 4px;
+      transition: color 0.18s var(--ease);
+    }
+    .sort-btn:hover { color: var(--ink); }
+    .sort-btn .arrow {
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-bottom: 5px solid currentColor;
+      opacity: 0.22;
+      transition: transform 0.2s var(--ease), opacity 0.2s var(--ease);
+    }
+    th[aria-sort="descending"] .sort-btn .arrow { opacity: 1; transform: rotate(180deg); }
+    th[aria-sort="ascending"] .sort-btn .arrow { opacity: 1; }
+
+    tbody td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
       vertical-align: middle;
     }
-    tbody tr:hover {
-      background: #f8fafc;
-    }
-    .col-rank {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-weight: 700;
-      color: var(--text-muted);
-      width: 50px;
-    }
-    .col-model {
-      font-weight: 700;
-      color: var(--text);
-    }
-    .badge-harness {
-      display: inline-block;
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: var(--bg-subtle);
-      color: var(--text-secondary);
-      border: 1px solid #e2e8f0;
-      margin-right: 4px;
-    }
-    .level-tag {
-      display: inline-block;
-      font-size: 0.74rem;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 4px;
-      letter-spacing: 0.02em;
-    }
-    .progress-track {
-      height: 6px;
-      background: var(--bg-subtle);
-      border-radius: 3px;
+    tbody tr { transition: background 0.15s var(--ease); }
+    tbody tr:hover { background: var(--accent-soft); }
+    tbody tr:last-child td { border-bottom: none; }
+    .col-rank { width: 48px; min-width: 48px; color: var(--ink-3); font-size: 0.82rem; }
+    .col-model { font-weight: 700; color: var(--ink); min-width: 150px; white-space: nowrap; }
+    .col-harness { color: var(--ink-3); font-size: 0.78rem; white-space: nowrap; }
+    .col-mdi { min-width: 160px; }
+    .col-level { font-size: 0.84rem; font-weight: 600; white-space: nowrap; }
+    .col-phrase { color: var(--ink-2); font-size: 0.83rem; max-width: 200px; }
+    .mdi-bar {
+      display: block;
+      height: 3px;
+      margin-top: 6px;
+      background: var(--line);
+      border-radius: 999px;
       overflow: hidden;
-      width: 90px;
-      display: inline-block;
-      vertical-align: middle;
-      margin-left: 8px;
     }
-    .progress-fill {
-      height: 100%;
-      border-radius: 3px;
+    .mdi-fill { display: block; height: 100%; border-radius: 999px; }
+    .empty-state {
+      display: none;
+      padding: 40px 18px;
+      text-align: center;
+      color: var(--ink-3);
+      font-size: 0.92rem;
     }
+    .empty-state.show { display: block; }
+    .empty-state .btn { margin-top: 14px; }
 
-    /* Agent breakdown cards */
-    .harness-matrix {
+    /* ---------- Harness comparison ---------- */
+    .harness-list {
+      list-style: none;
+      border-top: 1px solid var(--line);
+    }
+    .harness-row {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 14px;
-      margin-bottom: 36px;
+      grid-template-columns: minmax(0, 210px) minmax(0, 1fr) 84px 120px;
+      align-items: center;
+      gap: 16px;
+      padding: 13px 2px;
+      border-bottom: 1px solid var(--line);
+      transition: background 0.15s var(--ease);
     }
-    .harness-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      box-shadow: var(--shadow-sm);
-    }
-    .harness-title {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 8px;
-    }
-    .harness-stat-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      margin-top: 4px;
-    }
-    .harness-stat-row strong {
-      color: var(--text);
-    }
+    .harness-row:hover { background: var(--accent-soft); }
+    .harness-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .harness-track { height: 4px; background: var(--line); border-radius: 999px; overflow: hidden; }
+    .harness-fill { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+    .harness-num { font-weight: 700; text-align: right; }
+    .harness-count { color: var(--ink-3); font-size: 0.8rem; text-align: right; }
 
-    /* Timeline card */
-    .timeline-box {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      box-shadow: var(--shadow-sm);
-      margin-bottom: 36px;
-    }
-    .timeline-svg {
-      width: 100%;
-      height: 200px;
-    }
+    /* ---------- Timeline ---------- */
+    .chart-box { position: relative; padding: 8px 0 0; }
+    .timeline-svg { display: block; width: 100%; height: auto; }
+    .tl-point { transition: r 0.15s var(--ease), fill 0.15s var(--ease); cursor: pointer; }
+    .tl-point:hover { r: 5.5; fill: var(--accent-soft); }
     .timeline-labels {
       display: flex;
       justify-content: space-between;
-      font-size: 0.75rem;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      color: var(--text-muted);
       margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--ink-3);
+    }
+    .chart-tooltip {
+      position: absolute;
+      z-index: 10;
+      pointer-events: none;
+      background: var(--ink);
+      color: #fff;
+      padding: 7px 11px;
+      border-radius: var(--r-control);
+      font-size: 0.78rem;
+      transform: translate(-50%, calc(-100% - 10px));
+      white-space: nowrap;
     }
 
-    /* Vocabulary section */
-    .vocab-box {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px;
-      box-shadow: var(--shadow-sm);
-      margin-bottom: 36px;
-    }
-    .vocab-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .vocab-chip {
-      background: #fafafa;
-      border: 1px solid var(--border);
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .vocab-chip:hover {
-      border-color: var(--primary);
-      background: var(--primary-subtle);
-    }
-    .vocab-count {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--primary);
-      background: #ffffff;
-      padding: 2px 7px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-    }
-
-    /* Quote cards */
-    .quote-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 16px;
-      margin-bottom: 40px;
-    }
-    .quote-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--amber);
-      border-radius: var(--radius);
-      padding: 18px 20px;
-      box-shadow: var(--shadow-sm);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    .quote-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      font-size: 0.8rem;
-    }
-    .quote-body {
-      color: var(--text-secondary);
-      font-size: 0.88rem;
-      line-height: 1.6;
-      margin-bottom: 12px;
-    }
-    .quote-target {
-      background: var(--amber-subtle);
-      color: #92400e;
-      font-weight: 700;
-      padding: 1px 4px;
-      border-radius: 3px;
-    }
-    .quote-footer {
-      border-top: 1px solid #f1f5f9;
-      padding-top: 10px;
-      font-size: 0.74rem;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-    }
-
-    /* Buttons */
-    .button-bar {
-      display: flex;
-      justify-content: center;
-      gap: 14px;
-      margin-top: 40px;
-    }
-    .btn {
-      padding: 11px 22px;
-      border-radius: var(--radius-sm);
-      font-size: 0.88rem;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all 0.15s ease;
+    /* ---------- Phrase chips ---------- */
+    .phrase-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .phrase-chip {
+      appearance: none;
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      padding: 7px 13px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      color: var(--ink-2);
+      cursor: pointer;
+      transition: border-color 0.18s var(--ease), color 0.18s var(--ease), background 0.18s var(--ease);
     }
-    .btn-dark {
-      background: var(--text);
-      color: #fff;
+    .phrase-chip:hover { border-color: var(--accent); color: var(--accent-strong); }
+    .phrase-chip:active { transform: scale(0.97); }
+    .phrase-chip[aria-pressed="true"] {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent-strong);
+      font-weight: 600;
     }
-    .btn-dark:hover {
-      background: #1e293b;
-    }
-    .btn-outline {
-      background: #fff;
-      color: var(--text);
-      border: 1px solid var(--border-strong);
-    }
-    .btn-outline:hover {
-      background: #f8fafc;
-    }
+    .phrase-count { font-size: 0.76rem; color: var(--ink-3); }
+    .phrase-chip[aria-pressed="true"] .phrase-count { color: var(--accent-strong); }
 
-    footer {
-      margin-top: 60px;
-      border-top: 1px solid var(--border);
-      padding-top: 24px;
-      text-align: center;
-      color: var(--text-muted);
+    /* ---------- Quotes ---------- */
+    .quote-status { display: flex; align-items: center; gap: 12px; font-size: 0.84rem; color: var(--ink-3); }
+    .text-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--accent-strong);
+      font-family: inherit;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 6px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      transition: background var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+    }
+    .text-btn:hover { background: var(--accent-soft); }
+    .text-btn:active { opacity: 0.7; }
+    .text-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .quote-grid { columns: 2; column-gap: 32px; }
+    .quote-card {
+      break-inside: avoid;
+      margin-bottom: 24px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    .quote-body { color: var(--ink-2); font-size: 0.93rem; line-height: 1.9; }
+    .quote-target {
+      color: var(--accent-strong);
+      font-weight: 700;
+    }
+    .quote-foot {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: var(--ink-3);
+    }
+    .quote-model { font-weight: 600; color: var(--ink-2); }
+
+    /* ---------- Actions ---------- */
+    .actions {
+      margin-top: 56px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .actions-hint { flex-basis: 100%; font-size: 0.78rem; color: var(--ink-3); }
+    .btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--s-2);
+      min-height: 40px;
+      padding: var(--s-2) 18px;
+      border-radius: var(--r-control);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      font-family: inherit;
+      font-size: var(--fs-md);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+    }
+    .btn:hover { border-color: var(--ink-3); }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .btn-primary:hover { background: #262b36; border-color: #262b36; }
+    .btn-text {
+      border-color: transparent;
+      background: transparent;
+      color: var(--accent-strong);
+      padding-left: var(--s-2);
+      padding-right: var(--s-2);
+    }
+    .btn-text:hover { border-color: transparent; background: var(--accent-soft); }
+    .btn[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn.loading { cursor: progress; opacity: 0.85; }
+    .btn .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 999px;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---------- Footer ---------- */
+    footer.page-foot {
+      margin-top: 64px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+      color: var(--ink-3);
       font-size: 0.82rem;
+      line-height: 1.8;
     }
 
+    /* ---------- Overlays ---------- */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translate(-50%, 10px);
+      z-index: 80;
+      background: var(--ink);
+      color: #fff;
+      padding: 11px 18px;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--dur-med) var(--ease), transform var(--dur-med) var(--ease);
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast.error { background: var(--danger); }
+    .toast.success { background: var(--success); }
+
+    /* ---------- Tooltip (hover + keyboard focus) ---------- */
+    [data-tip] { position: relative; }
+    [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      transform: translate(-50%, 4px);
+      z-index: 60;
+      background: var(--ink);
+      color: #fff;
+      padding: 7px 11px;
+      border-radius: var(--r-control);
+      font-family: var(--font-sans);
+      font-size: var(--fs-xs);
+      font-weight: 500;
+      letter-spacing: 0;
+      line-height: 1.5;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+    }
+    [data-tip]:hover::after,
+    [data-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+
+    .back-top {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 70;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink-2);
+      font-size: 1.05rem;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity var(--dur-med) var(--ease), transform var(--dur-med) var(--ease), border-color var(--dur-fast) var(--ease);
+    }
+    .back-top.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    .back-top:hover { border-color: var(--ink-3); }
+    .back-top:active { transform: translateY(0) scale(0.96); }
+
+    .no-data { padding: 40px 0; text-align: center; color: var(--ink-3); font-size: 0.92rem; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 900px) {
+      .summary { grid-template-columns: 1fr 1fr; gap: 24px 0; }
+      .sum-item:nth-child(3) { padding-left: 0; border-left: none; }
+      .quote-grid { columns: 1; }
+    }
     @media (max-width: 860px) {
-      .metrics-grid { grid-template-columns: 1fr; }
-      .showcase-grid { grid-template-columns: 1fr; }
-      .table-toolbar { flex-direction: column; gap: 12px; align-items: stretch; }
+      body { padding: 0 16px 80px; }
+      .masthead { padding: 36px 0 28px; }
+      .masthead-main { align-items: center; }
+      .masthead-mascot { width: 84px; }
+      section { margin-top: 52px; }
+      .summary { grid-template-columns: 1fr 1fr; }
+      .sum-value, .sum-verdict { font-size: 1.7rem; }
+      .table-scroll { overflow-x: auto; }
+      table { min-width: 860px; }
+      .table-toolbar { flex-direction: column; align-items: stretch; }
+      .segmented { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); width: 100%; }
+      .seg-btn { width: 100%; }
       .search-input { width: 100%; }
+      .harness-row { grid-template-columns: 1fr auto; grid-template-areas: "name num" "track count"; }
+      .harness-name { grid-area: name; }
+      .harness-num { grid-area: num; }
+      .harness-track { grid-area: track; }
+      .harness-count { grid-area: count; }
+      .actions .btn { flex: 1 1 100%; }
+    }
+
+    /* ---------- Reduced motion ---------- */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* ---------- Print ---------- */
+    @media print {
+      body { background: #fff; padding: 0; }
+      .table-toolbar, .result-line, .actions, .back-top, .toast { display: none !important; }
+      .quote-card, .harness-list, table { break-inside: avoid; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="brand-eyebrow">SHALEME · MODEL BEHAVIOR BENCHMARK 2026</div>
-      <h1>AI 模型「你说得对」行为基准分析报告</h1>
-      <p class="subtitle">全面透视各大本地 Coding Agent 历史会话，量化各模型在面对用户质疑或交互时的顺从、妥协与附和倾向（Sycophancy Index / MDI）。</p>
-      <div class="meta-row">
-        <span>报告生成时间: ${summary.generatedDate}</span>
-        <span>扫描有效会话: ${summary.totalSessionsScanned} 组</span>
-        <span>纳入分析 Agent: ${summary.activeHarnessCount} 个平台</span>
+  <main class="container">
+    <header class="masthead">
+      <div class="brand-row">
+        <div class="brand">SHALEME<span class="sub">傻了么</span></div>
+        <div class="meta num">${summary.generatedDate} · ${summary.totalSessionsScanned.toLocaleString()} 组会话 · ${summary.activeHarnessCount} 个平台</div>
+      </div>
+      <div class="masthead-main">
+        <h1>AI 模型<span class="hl">「你说得对」</span>行为基准分析报告</h1>
+        ${mascotImg}
       </div>
     </header>
 
-    <!-- Executive Metrics -->
-    <div class="metrics-grid">
-      <div class="metric-card highlight">
-        <div class="metric-title">综合行为倾向评级</div>
-        <div class="metric-value">${summary.overallDroolLevel.name}</div>
-        <div class="metric-chip" style="background:${summary.overallDroolLevel.color}15; color:${summary.overallDroolLevel.color}; border: 1px solid ${summary.overallDroolLevel.color}35;">
-          ${summary.overallDroolLevel.badge}
-        </div>
-        <div class="metric-desc">${summary.overallDroolLevel.tagline}</div>
+    <section class="summary" aria-label="总体统计">
+      <div class="sum-item">
+        <span class="sum-label">综合评级</span>
+        <strong class="sum-verdict">${summary.overallDroolLevel.name}</strong>
+        <span class="sum-note">${summary.overallDroolLevel.tagline}</span>
       </div>
-
-      <div class="metric-card">
-        <div class="metric-title">抓获「你说得对」频次</div>
-        <div class="metric-value">${summary.totalDroolCount.toLocaleString()} <small>次</small></div>
-        <div class="metric-desc">在所有分析样本中命中认同附和模式的总次数</div>
+      <div class="sum-item">
+        <span class="sum-label">「你说得对」频次</span>
+        <span class="sum-value">${summary.totalDroolCount.toLocaleString()}<small>次</small></span>
       </div>
-
-      <div class="metric-card">
-        <div class="metric-title">流口水指数 (MDI)</div>
-        <div class="metric-value">${summary.overallDroolIndex} <small>‰</small></div>
-        <div class="metric-desc">平均每 1000 次助手回复中出现认怂附和的频率</div>
+      <div class="sum-item">
+        <span class="sum-label" data-tip="每 1000 次助手回复中命中认怂附和的次数" tabindex="0">流口水指数 MDI</span>
+        <span class="sum-value">${summary.overallDroolIndex}<small>‰</small></span>
       </div>
-
-      <div class="metric-card">
-        <div class="metric-title">分析消息样本量</div>
-        <div class="metric-value">${summary.totalAssistantMessages.toLocaleString()} <small>条</small></div>
-        <div class="metric-desc">来自各平台真实工程会话的模型回答总样本</div>
+      <div class="sum-item">
+        <span class="sum-label">助手回复样本</span>
+        <span class="sum-value">${summary.totalAssistantMessages.toLocaleString()}<small>条</small></span>
       </div>
-    </div>
+    </section>
 
-    <!-- Top Tier Featured Showcase -->
-    ${
-      top1
-        ? `
-    <div class="section-title-wrap">
-      <div class="section-title">TOP TIER · 附和频次榜首模型</div>
-      <div class="section-meta">根据触发绝对次数与频率联合定序</div>
-    </div>
-    <div class="showcase-grid">
-      <div class="showcase-card rank-1">
-        <div>
-          <div class="showcase-top">
-            <span class="rank-indicator">RANK 01</span>
-            <span class="level-tag" style="background:${top1.droolLevel.color}15; color:${top1.droolLevel.color}; border:1px solid ${top1.droolLevel.color}35;">
-              ${top1.droolLevel.badge}
-            </span>
-          </div>
-          <div class="showcase-model">${escapeHtml(top1.model)}</div>
-          <div class="showcase-stat-hero">
-            ${top1.droolCount} <small>次「你说得对」</small>
-          </div>
-        </div>
-        <div class="showcase-details">
-          <div class="showcase-detail-row">
-            <span>流口水指数 MDI:</span>
-            <strong>${top1.droolIndex} ‰</strong>
-          </div>
-          <div class="showcase-detail-row">
-            <span>触发概率:</span>
-            <strong>${top1.droolRate}%</strong>
-          </div>
-          <div class="showcase-detail-row">
-            <span>主导口头禅:</span>
-            <strong>「${escapeHtml(top1.topPhrases[0]?.phrase || '无')}」</strong>
-          </div>
-          <div class="showcase-detail-row">
-            <span>总样本量:</span>
-            <span>${top1.totalMessages} 条</span>
-          </div>
-        </div>
+    <section id="ranking">
+      <div class="section-head">
+        <h2>完整模型行为排行榜</h2>
+        <span class="section-meta">共 ${summary.modelRankings.length} 个模型</span>
       </div>
-
-      ${
-        top2
-          ? `
-      <div class="showcase-card rank-2">
-        <div>
-          <div class="showcase-top">
-            <span class="rank-indicator">RANK 02</span>
-            <span class="level-tag" style="background:${top2.droolLevel.color}15; color:${top2.droolLevel.color}; border:1px solid ${top2.droolLevel.color}35;">
-              ${top2.droolLevel.badge}
-            </span>
-          </div>
-          <div class="showcase-model">${escapeHtml(top2.model)}</div>
-          <div class="showcase-stat-hero">
-            ${top2.droolCount} <small>次「你说得对」</small>
-          </div>
-        </div>
-        <div class="showcase-details">
-          <div class="showcase-detail-row">
-            <span>流口水指数 MDI:</span>
-            <strong>${top2.droolIndex} ‰</strong>
-          </div>
-          <div class="showcase-detail-row">
-            <span>触发概率:</span>
-            <strong>${top2.droolRate}%</strong>
-          </div>
-          <div class="showcase-detail-row">
-            <span>主导口头禅:</span>
-            <strong>「${escapeHtml(top2.topPhrases[0]?.phrase || '无')}」</strong>
-          </div>
-          <div class="showcase-detail-row">
-            <span>总样本量:</span>
-            <span>${top2.totalMessages} 条</span>
-          </div>
-        </div>
-      </div>`
-          : '<div></div>'
-      }
-
-      ${
-        top3
-          ? `
-      <div class="showcase-card rank-3">
-        <div>
-          <div class="showcase-top">
-            <span class="rank-indicator">RANK 03</span>
-            <span class="level-tag" style="background:${top3.droolLevel.color}15; color:${top3.droolLevel.color}; border:1px solid ${top3.droolLevel.color}35;">
-              ${top3.droolLevel.badge}
-            </span>
-          </div>
-          <div class="showcase-model">${escapeHtml(top3.model)}</div>
-          <div class="showcase-stat-hero">
-            ${top3.droolCount} <small>次「你说得对」</small>
-          </div>
-        </div>
-        <div class="showcase-details">
-          <div class="showcase-detail-row">
-            <span>流口水指数 MDI:</span>
-            <strong>${top3.droolIndex} ‰</strong>
-          </div>
-          <div class="showcase-detail-row">
-            <span>触发概率:</span>
-            <strong>${top3.droolRate}%</strong>
-          </div>
-          <div class="showcase-detail-row">
-            <span>主导口头禅:</span>
-            <strong>「${escapeHtml(top3.topPhrases[0]?.phrase || '无')}」</strong>
-          </div>
-          <div class="showcase-detail-row">
-            <span>总样本量:</span>
-            <span>${top3.totalMessages} 条</span>
-          </div>
-        </div>
-      </div>`
-          : '<div></div>'
-      }
-    </div>
-    `
-        : ''
-    }
-
-    <!-- Leaderboard Benchmark Matrix -->
-    <div class="section-title-wrap">
-      <div class="section-title">BENCHMARK MATRIX · 完整模型行为排行榜</div>
-      <div class="section-meta">共 ${summary.modelRankings.length} 个模型纳入比对</div>
-    </div>
-    <div class="table-container">
       <div class="table-toolbar">
-        <div class="filter-tabs">
-          <button class="filter-tab active" onclick="setFilter('all', this)">全部模型</button>
-          <button class="filter-tab" onclick="setFilter('high', this)">高频附和 (>10‰)</button>
-          <button class="filter-tab" onclick="setFilter('low', this)">独立客观 (≤10‰)</button>
+        <div class="segmented" role="group" aria-label="按附和倾向筛选模型">
+          <button type="button" class="seg-btn" data-filter="all" aria-pressed="true" tabindex="0" onclick="setFilter('all', this)">全部模型</button>
+          <button type="button" class="seg-btn" data-filter="high" aria-pressed="false" tabindex="-1" onclick="setFilter('high', this)">高频附和 (&gt;10‰)</button>
+          <button type="button" class="seg-btn" data-filter="low" aria-pressed="false" tabindex="-1" onclick="setFilter('low', this)">独立客观 (≤10‰)</button>
         </div>
-        <input type="text" id="modelFilter" class="search-input" placeholder="输入模型名称过滤..." oninput="handleSearch()">
+        <div class="search-wrap">
+          <label class="visually-hidden" for="modelFilter">按模型名称搜索</label>
+          <input type="text" id="modelFilter" class="search-input" placeholder="搜索模型名称" autocomplete="off" oninput="handleSearch()">
+          <button type="button" class="search-clear" id="searchClear" aria-label="清除搜索" onclick="clearSearch()">×</button>
+        </div>
       </div>
-      <table id="benchmarkTable">
-        <thead>
-          <tr>
-            <th class="col-rank">#</th>
-            <th>模型标识</th>
-            <th>承载平台</th>
-            <th style="text-align: right;">触发次数</th>
-            <th style="text-align: right;">总样本条数</th>
-            <th style="text-align: right;">触发率</th>
-            <th>流口水指数 (MDI)</th>
-            <th>倾向评级</th>
-            <th>特征附和短语</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${summary.modelRankings
-            .map((m, idx) => {
-              const rankStr = String(idx + 1).padStart(2, '0');
-              const topP = m.topPhrases[0]?.phrase || '无';
-              const maxMdi = Math.max(...summary.modelRankings.map((r) => r.droolIndex), 1);
-              const barWidth = Math.min(100, Math.round((m.droolIndex / maxMdi) * 100));
-              return `
-            <tr data-model="${escapeHtml(m.model.toLowerCase())}" data-mdi="${m.droolIndex}">
-              <td class="col-rank">${rankStr}</td>
-              <td class="col-model">${escapeHtml(m.model)}</td>
-              <td>
-                ${m.harnesses.map((h) => `<span class="badge-harness">${escapeHtml(h)}</span>`).join('')}
-              </td>
-              <td style="text-align: right; font-weight: 700; color: var(--text);">${m.droolCount}</td>
-              <td style="text-align: right; color: var(--text-muted); font-family: ui-monospace, monospace;">${m.totalMessages}</td>
-              <td style="text-align: right; font-family: ui-monospace, monospace; color: var(--text-secondary);">${m.droolRate}%</td>
-              <td>
-                <span style="font-family: ui-monospace, monospace; font-weight: 700;">${m.droolIndex} ‰</span>
-                <span class="progress-track">
-                  <span class="progress-fill" style="width: ${barWidth}%; background: ${m.droolLevel.color};"></span>
-                </span>
-              </td>
-              <td>
-                <span class="level-tag" style="background:${m.droolLevel.color}15; color:${m.droolLevel.color}; border:1px solid ${m.droolLevel.color}35;">
-                  ${m.droolLevel.badge}
-                </span>
-              </td>
-              <td style="color: var(--text-secondary); font-size: 0.82rem;">「${escapeHtml(topP)}」</td>
+      <div class="result-line">
+        <span id="resultCount" aria-live="polite">显示 ${summary.modelRankings.length} / ${summary.modelRankings.length} 个模型</span>
+      </div>
+      <div class="table-scroll">
+        <table id="benchmarkTable">
+          <thead id="tableHead">
+            <tr>
+              <th class="col-rank" aria-sort="descending"><button type="button" class="sort-btn" onclick="sortTable('rank', this)">#<span class="arrow"></span></button></th>
+              <th>模型标识</th>
+              <th class="col-harness">承载平台</th>
+              <th class="right" aria-sort="none"><button type="button" class="sort-btn" onclick="sortTable('count', this)">触发次数<span class="arrow"></span></button></th>
+              <th class="right" aria-sort="none"><button type="button" class="sort-btn" onclick="sortTable('total', this)">总样本条数<span class="arrow"></span></button></th>
+              <th class="right" aria-sort="none"><button type="button" class="sort-btn" onclick="sortTable('rate', this)">触发率<span class="arrow"></span></button></th>
+              <th class="col-mdi" aria-sort="none"><button type="button" class="sort-btn" data-tip="每 1000 次助手回复中命中认怂附和的次数" onclick="sortTable('mdi', this)">流口水指数 (MDI)<span class="arrow"></span></button></th>
+              <th>倾向评级</th>
+              <th class="col-phrase">特征附和短语</th>
             </tr>
-            `;
-            })
-            .join('')}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Agent Harness Breakdown -->
-    <div class="section-title-wrap">
-      <div class="section-title">HARNESS ANALYSIS · 各 Agent 平台行为对比</div>
-      <div class="section-meta">观察不同客户端在系统提示词与交互范式下的认同倾向</div>
-    </div>
-    <div class="harness-matrix">
-      ${Object.values(summary.harnessStats)
-        .filter((h) => h.messageCount > 0)
-        .map((h) => {
-          return `
-        <div class="harness-card">
-          <div class="harness-title">${escapeHtml(h.name)}</div>
-          <div class="harness-stat-row">
-            <span>认同触发数:</span>
-            <strong>${h.droolCount} 次</strong>
-          </div>
-          <div class="harness-stat-row">
-            <span>总样本量:</span>
-            <span>${h.messageCount} 条</span>
-          </div>
-          <div class="harness-stat-row">
-            <span>平台 MDI 指数:</span>
-            <strong style="color: var(--primary);">${h.droolIndex} ‰</strong>
-          </div>
-        </div>
-        `;
-        })
-        .join('')}
-    </div>
-
-    <!-- Timeline Chart -->
-    <div class="section-title-wrap">
-      <div class="section-title">HISTORICAL OBSERVATION · 时间序列分布</div>
-      <div class="section-meta">每日命中「你说得对」频次走势</div>
-    </div>
-    <div class="timeline-box">
-      ${timelineSvg}
-    </div>
-
-    <!-- Vocabulary Cloud -->
-    <div class="section-title-wrap">
-      <div class="section-title">SYCOPHANCY LEXICON · 特征附和短语聚集</div>
-      <div class="section-meta">点击短语可筛选下方引用的名场面语录</div>
-    </div>
-    <div class="vocab-box">
-      <div class="vocab-chips">
-        ${summary.phraseCloud
-          .map(
-            (p) => `
-          <div class="vocab-chip" onclick="filterByPhrase('${escapeHtml(p.text)}')">
-            <span>${escapeHtml(p.text)}</span>
-            <span class="vocab-count">${p.count}</span>
-          </div>
-        `,
-          )
-          .join('')}
+          </thead>
+          <tbody id="tableBody">
+            ${modelRowsHtml}
+          </tbody>
+        </table>
       </div>
-    </div>
+      <div class="empty-state" id="tableEmpty">
+        <p>没有匹配当前筛选条件的模型。</p>
+        <button type="button" class="btn" onclick="resetFilters()">查看全部模型</button>
+      </div>
+    </section>
 
-    <!-- Citations / Hall of Shame -->
-    <div class="section-title-wrap">
-      <div class="section-title">CASE CITATIONS · 真实典型附和对话摘录</div>
-      <div class="section-meta">模型在被质疑后快速反转或顺从认同的语境片段</div>
-    </div>
-    <div class="quote-grid" id="quotesGrid">
-      ${summary.hallOfShame
-        .map((match) => {
-          const escapedText = escapeHtml(match.snippet);
-          const safePhrasePattern = escapeRegex(escapeHtml(match.phrase));
-          let highlighted = escapedText;
-          try {
-            highlighted = escapedText.replace(
-              new RegExp(safePhrasePattern, 'gi'),
-              `<span class="quote-target">$&</span>`,
-            );
-          } catch {
-            // Fallback if regex construction fails
-          }
-          return `
-        <div class="quote-card" data-phrase="${escapeHtml(match.phrase.toLowerCase())}">
-          <div class="quote-header">
-            <span style="font-weight: 700; color: var(--text);">${escapeHtml(match.model)}</span>
-            <span class="badge-harness">${escapeHtml(match.harness)}</span>
-          </div>
-          <div class="quote-body">${highlighted}</div>
-          <div class="quote-footer">
-            <span>模式: ${escapeHtml(match.phrase)}</span>
-            <span>${new Date(match.timestamp).toLocaleDateString()}</span>
-          </div>
+    <section id="harness">
+      <div class="section-head">
+        <h2>各 Agent 平台行为对比</h2>
+      </div>
+      <ul class="harness-list">
+        ${harnessRowsHtml}
+      </ul>
+    </section>
+
+    <section id="timeline">
+      <div class="section-head">
+        <h2>时间序列分布</h2>
+      </div>
+      <div class="chart-box">
+        ${timelineSvg}
+      </div>
+    </section>
+
+    <section id="lexicon">
+      <div class="section-head">
+        <h2>特征附和短语</h2>
+        <span class="section-meta">共 ${summary.phraseCloud.length} 个</span>
+      </div>
+      <div class="phrase-chips" id="phraseChips">
+        ${phraseChipsHtml}
+      </div>
+    </section>
+
+    <section id="quotes">
+      <div class="section-head">
+        <h2>附和对话摘录</h2>
+        <div class="quote-status">
+          <span id="quoteCount" aria-live="polite">显示 ${summary.hallOfShame.length} / ${summary.hallOfShame.length} 条</span>
+          <button type="button" class="text-btn" id="clearPhraseBtn" hidden onclick="clearPhraseFilter()">清除筛选</button>
         </div>
-        `;
-        })
-        .join('')}
-    </div>
+      </div>
+      <div class="quote-grid" id="quotesGrid">
+        ${quoteCardsHtml}
+      </div>
+      <div class="empty-state" id="quotesEmpty">
+        <p>该短语在摘录中没有对应片段。</p>
+        <button type="button" class="btn" onclick="clearPhraseFilter()">查看全部摘录</button>
+      </div>
+    </section>
 
-    <!-- Export & Sharing -->
-    <div class="button-bar">
-      <button class="btn btn-dark" onclick="copySummaryText()">复制基准战报摘要</button>
-      <button class="btn btn-outline" onclick="window.print()">打印 / 导出 PDF</button>
-      <button class="btn btn-outline" onclick="exportPayload()">导出成绩 JSON</button>
-      <button class="btn btn-outline" onclick="submitToLeaderboard()">上传到榜单</button>
-    </div>
+    <section class="actions" aria-label="导出与分享">
+      <button type="button" class="btn btn-primary" id="copyBtn" onclick="copySummaryText()">复制战报摘要</button>
+      <button type="button" class="btn" onclick="exportPayload()">导出成绩 JSON</button>
+      <button type="button" class="btn" onclick="window.print()">打印 / 导出 PDF</button>
+      <button type="button" class="btn" id="uploadBtn" onclick="submitToLeaderboard()">上传到榜单</button>
+      <p class="actions-hint">上传仅含汇总计数，不含对话内容。</p>
+    </section>
 
-    <footer>
-      <p>SHALEME · AI 模型客观度与顺从行为基准分析 • 纯本地运行 • 零数据外传</p>
-      <p class="footer-note">分析全程在本机完成，报告不上传任何数据。只有你主动点击「上传到榜单」时，才会发送上方的汇总计数（模型名与次数，不含对话内容）。</p>
+    <footer class="page-foot">
+      <p>SHALEME · 分析全程在本机完成，只有点击「上传到榜单」时才发送汇总计数。</p>
     </footer>
-  </div>
+  </main>
+
+  <button type="button" class="back-top" id="backTop" aria-label="回到顶部" onclick="backToTop()">↑</button>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
     const reportData = ${serialized};
+    const leaderboardEndpoint = ${JSON.stringify(endpoint)};
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let currentFilterType = 'all';
+    let searchTimer = null;
+    let activePhrase = '';
 
+    /* ---------- toast ---------- */
+    let toastTimer = null;
+    function toast(message, type) {
+      const el = document.getElementById('toast');
+      el.textContent = message;
+      el.className = 'toast show' + (type ? ' ' + type : '');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2400);
+    }
+
+    /* ---------- table filter + search ---------- */
     function setFilter(type, el) {
       currentFilterType = type;
-      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-      el.classList.add('active');
+      document.querySelectorAll('.seg-btn').forEach(function (t) {
+        t.setAttribute('aria-pressed', t === el ? 'true' : 'false');
+        t.tabIndex = t === el ? 0 : -1;
+      });
       applyFilters();
     }
 
+    /* roving tabindex: arrows move + select, Home/End jump */
+    document.querySelector('.segmented').addEventListener('keydown', function (e) {
+      const items = Array.prototype.slice.call(this.querySelectorAll('.seg-btn'));
+      const current = items.indexOf(document.activeElement);
+      if (current === -1) return;
+      let next = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (current + 1) % items.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (current - 1 + items.length) % items.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = items.length - 1;
+      if (next === -1) return;
+      e.preventDefault();
+      items[next].focus();
+      setFilter(items[next].getAttribute('data-filter'), items[next]);
+    });
+
     function handleSearch() {
+      const input = document.getElementById('modelFilter');
+      document.getElementById('searchClear').classList.toggle('show', input.value.length > 0);
+      if (composing) return;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(applyFilters, 140);
+    }
+
+    /* IME composition: don't filter mid-pinyin, apply on commit */
+    let composing = false;
+    document.getElementById('modelFilter').addEventListener('compositionstart', function () { composing = true; });
+    document.getElementById('modelFilter').addEventListener('compositionend', function () {
+      composing = false;
+      handleSearch();
+    });
+
+    function clearSearch() {
+      const input = document.getElementById('modelFilter');
+      input.value = '';
+      document.getElementById('searchClear').classList.remove('show');
       applyFilters();
+      input.focus();
+    }
+
+    function resetFilters() {
+      clearSearch();
+      setFilter('all', document.querySelector('.seg-btn'));
     }
 
     function applyFilters() {
-      const q = (document.getElementById('modelFilter').value || '').toLowerCase();
-      const rows = document.querySelectorAll('#benchmarkTable tbody tr');
+      const q = (document.getElementById('modelFilter').value || '').trim().toLowerCase();
+      const rows = document.querySelectorAll('#tableBody tr');
+      let shown = 0;
 
-      rows.forEach(r => {
+      rows.forEach(function (r) {
         const m = (r.getAttribute('data-model') || '').toLowerCase();
-        const mdi = parseFloat(r.getAttribute('data-mdi') || '0');
+        const mdi = parseFloat(r.getAttribute('data-sort-mdi') || '0');
 
         let matchFilter = true;
         if (currentFilterType === 'high') {
@@ -1021,45 +1052,87 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
           matchFilter = mdi <= 10;
         }
 
-        const matchSearch = m.includes(q);
-        r.style.display = (matchFilter && matchSearch) ? '' : 'none';
+        const matchSearch = q === '' || m.indexOf(q) !== -1;
+        const visible = matchFilter && matchSearch;
+        r.hidden = !visible;
+        if (visible) shown += 1;
       });
+
+      document.getElementById('resultCount').textContent = '显示 ' + shown + ' / ' + rows.length + ' 个模型';
+      document.getElementById('tableEmpty').classList.toggle('show', shown === 0);
     }
 
-    function filterByPhrase(phrase) {
+    /* ---------- table sorting ---------- */
+    let sortState = { key: 'rank', dir: 'desc' };
+    function sortTable(key, btn) {
+      const th = btn.closest('th');
+      const dir = sortState.key === key && sortState.dir === 'desc' ? 'asc' : 'desc';
+      sortState = { key: key, dir: dir };
+
+      const head = document.getElementById('tableHead');
+      head.querySelectorAll('th').forEach(function (h) {
+        if (h.hasAttribute('aria-sort')) h.setAttribute('aria-sort', 'none');
+      });
+      th.setAttribute('aria-sort', dir === 'desc' ? 'descending' : 'ascending');
+
+      const tbody = document.getElementById('tableBody');
+      const rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+      const attr = { rank: 'data-sort-rank', count: 'data-sort-count', total: 'data-sort-total', rate: 'data-sort-rate', mdi: 'data-sort-mdi' }[key];
+      rows.sort(function (a, b) {
+        const va = parseFloat(a.getAttribute(attr) || '0');
+        const vb = parseFloat(b.getAttribute(attr) || '0');
+        return dir === 'desc' ? vb - va : va - vb;
+      });
+      rows.forEach(function (r) { tbody.appendChild(r); });
+    }
+
+    /* ---------- phrase filter on quotes ---------- */
+    document.getElementById('phraseChips').addEventListener('click', function (e) {
+      const btn = e.target.closest('.phrase-chip');
+      if (btn) filterByPhrase(btn.getAttribute('data-phrase') || '', btn);
+    });
+
+    function filterByPhrase(phrase, el) {
       const p = phrase.toLowerCase();
+      if (activePhrase === p) {
+        clearPhraseFilter();
+        return;
+      }
+      activePhrase = p;
+
+      document.querySelectorAll('.phrase-chip').forEach(function (c) {
+        c.setAttribute('aria-pressed', c === el ? 'true' : 'false');
+      });
+
       const cards = document.querySelectorAll('#quotesGrid .quote-card');
-      cards.forEach(c => {
+      let shown = 0;
+      cards.forEach(function (c) {
         const cardPhrase = (c.getAttribute('data-phrase') || '').toLowerCase();
-        c.style.display = cardPhrase.includes(p) ? '' : 'none';
+        const visible = cardPhrase.indexOf(p) !== -1;
+        c.hidden = !visible;
+        if (visible) shown += 1;
       });
-      document.getElementById('quotesGrid').scrollIntoView({ behavior: 'smooth' });
+
+      document.getElementById('quoteCount').textContent = '显示 ' + shown + ' / ' + cards.length + ' 条';
+      document.getElementById('clearPhraseBtn').hidden = false;
+      document.getElementById('quotesEmpty').classList.toggle('show', shown === 0);
+
+      document.getElementById('quotes').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     }
 
-    function copySummaryText() {
-      const topModel = reportData.modelRankings[0]?.model || '未知';
-      const topCount = reportData.modelRankings[0]?.droolCount || 0;
-      const text = [
-        '【SHALEME · AI 模型「你说得对」行为基准战报】',
-        '--------------------------------------------',
-        '• 总体判定分级: ' + reportData.overallDroolLevel.name,
-        '• 抓获「你说得对」频次: ' + reportData.totalDroolCount + ' 次',
-        '• 分析助手回复样本: ' + reportData.totalAssistantMessages + ' 条',
-        '• 模型流口水指数 (MDI): ' + reportData.overallDroolIndex + ' ‰',
-        '• 附和频次榜首模型: ' + topModel + ' (' + topCount + ' 次认怂附和)',
-        '--------------------------------------------',
-        '运行 npx shaleme 或 bunx shaleme 检验你的 AI 模型独立性与顺从倾向！'
-      ].join('\\n');
-
-      navigator.clipboard.writeText(text).then(() => {
-        alert('战报摘要已成功复制到剪贴板！');
-      }).catch(() => {
-        alert(text);
+    function clearPhraseFilter() {
+      activePhrase = '';
+      document.querySelectorAll('.phrase-chip').forEach(function (c) {
+        c.setAttribute('aria-pressed', 'false');
       });
+      const cards = document.querySelectorAll('#quotesGrid .quote-card');
+      cards.forEach(function (c) { c.hidden = false; });
+      document.getElementById('quoteCount').textContent = '显示 ' + cards.length + ' / ' + cards.length + ' 条';
+      document.getElementById('clearPhraseBtn').hidden = true;
+      document.getElementById('quotesEmpty').classList.remove('show');
     }
 
-    // Built once from the embedded report; this is the only data that can ever
-    // leave the machine, and only on an explicit click.
+    /* ---------- export + share ---------- */
     function buildPayload() {
       return {
         version: reportData.version,
@@ -1076,8 +1149,64 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
             mdi: m.droolIndex,
           };
         }),
+        harnessEntries: Object.values(reportData.harnessStats)
+          .filter(function (h) { return h.messageCount > 0; })
+          .map(function (h) {
+            return {
+              harness: h.name,
+              droolCount: h.droolCount,
+              totalMessages: h.messageCount,
+              mdi: h.droolIndex,
+            };
+          }),
         generatedAt: reportData.generatedAt,
       };
+    }
+
+    function copySummaryText() {
+      const topModel = reportData.modelRankings[0]?.model || '未知';
+      const topCount = reportData.modelRankings[0]?.droolCount || 0;
+      const text = [
+        '【SHALEME · AI 模型「你说得对」行为基准战报】',
+        '--------------------------------------------',
+        '· 总体判定分级: ' + reportData.overallDroolLevel.name,
+        '· 抓获「你说得对」频次: ' + reportData.totalDroolCount + ' 次',
+        '· 分析助手回复样本: ' + reportData.totalAssistantMessages + ' 条',
+        '· 模型流口水指数 (MDI): ' + reportData.overallDroolIndex + ' ‰',
+        '· 附和频次榜首模型: ' + topModel + ' (' + topCount + ' 次认怂附和)',
+        '--------------------------------------------',
+        '运行 npx shaleme 或 bunx shaleme 检验你的 AI 模型独立性与顺从倾向！'
+      ].join('\\n');
+
+      const done = function () {
+        toast('战报摘要已复制到剪贴板');
+        const btn = document.getElementById('copyBtn');
+        const original = btn.textContent;
+        btn.textContent = '已复制';
+        setTimeout(function () { btn.textContent = original; }, 1600);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () {
+          fallbackCopy(text);
+          done();
+        });
+      } else {
+        fallbackCopy(text);
+        done();
+      }
+    }
+
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) { toast('复制失败，请手动导出 JSON', 'error'); }
+      document.body.removeChild(ta);
     }
 
     function exportPayload() {
@@ -1092,20 +1221,25 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      toast('成绩 JSON 已导出');
     }
 
     function submitToLeaderboard() {
-      const endpoint = ${JSON.stringify(endpoint)};
-      if (!endpoint) {
-        alert('本报告未配置榜单地址。\\n\\n可先「导出成绩 JSON」，再到榜单页面手动上传。');
+      if (!leaderboardEndpoint) {
+        toast('本报告未配置榜单地址，请先导出成绩 JSON');
         return;
       }
+      const btn = document.getElementById('uploadBtn');
+      btn.disabled = true;
+      btn.classList.add('loading');
+      btn.setAttribute('aria-busy', 'true');
+      btn.innerHTML = '<span class="spinner"></span>正在上传…';
       const payload = buildPayload();
       const form = document.createElement('form');
       form.method = 'POST';
-      form.action = endpoint;
+      form.action = leaderboardEndpoint;
       // Submit as a single JSON field so the server never has to know the
-      // individual metric names — the leaderboard owns that schema.
+      // individual metric names, the leaderboard owns that schema.
       const field = document.createElement('input');
       field.type = 'hidden';
       field.name = 'payload';
@@ -1114,6 +1248,62 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
       document.body.appendChild(form);
       form.submit();
     }
+
+    /* ---------- chart tooltip ---------- */
+    (function initChartTooltip() {
+      const tip = document.getElementById('chartTooltip');
+      if (!tip) return;
+      const box = document.querySelector('.chart-box');
+      document.querySelectorAll('.tl-point').forEach(function (pt) {
+        pt.addEventListener('mouseenter', function () {
+          tip.textContent = pt.getAttribute('data-date') + ': ' + pt.getAttribute('data-count') + ' 次';
+          const boxRect = box.getBoundingClientRect();
+          const ptRect = pt.getBoundingClientRect();
+          tip.style.left = (ptRect.left - boxRect.left + ptRect.width / 2) + 'px';
+          tip.style.top = (ptRect.top - boxRect.top) + 'px';
+          tip.hidden = false;
+        });
+        pt.addEventListener('mouseleave', function () { tip.hidden = true; });
+      });
+    })();
+
+    /* ---------- sticky table head shadow ---------- */
+    (function initStickyHead() {
+      const head = document.getElementById('tableHead');
+      const table = document.getElementById('benchmarkTable');
+      if (!head || !table || !('IntersectionObserver' in window)) return;
+      const sentinel = document.createElement('div');
+      sentinel.style.cssText = 'position:absolute;top:0;height:1px;width:1px;';
+      table.parentElement.insertBefore(sentinel, table);
+      const io = new IntersectionObserver(function (entries) {
+        head.classList.toggle('stuck', !entries[0].isIntersecting);
+      });
+      io.observe(sentinel);
+    })();
+
+    /* ---------- back to top ---------- */
+    (function initBackTop() {
+      const btn = document.getElementById('backTop');
+      if (!('IntersectionObserver' in window)) return;
+      const sentinel = document.createElement('div');
+      sentinel.style.cssText = 'position:absolute;top:640px;height:1px;width:1px;';
+      document.body.appendChild(sentinel);
+      const io = new IntersectionObserver(function (entries) {
+        btn.classList.toggle('show', !entries[0].isIntersecting);
+      });
+      io.observe(sentinel);
+    })();
+
+    function backToTop() {
+      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+    }
+
+    /* ---------- keyboard: Esc clears search ---------- */
+    document.getElementById('modelFilter').addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') clearSearch();
+    });
+
+    applyFilters();
   </script>
 </body>
 </html>`;

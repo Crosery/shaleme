@@ -7,7 +7,7 @@
  */
 
 import { getDroolLevel } from '../detector';
-import { DailyPoint, HarnessId, HarnessStats, ModelStats, ReportSummary } from '../types';
+import { DailyPoint, DroolMatch, HarnessId, HarnessStats, ModelStats, ReportSummary } from '../types';
 import { AggregatedStats } from './aggregate';
 
 export const HARNESS_NAMES: Record<HarnessId, string> = {
@@ -97,20 +97,42 @@ export function buildReportSummary(input: PlannerInput): ReportSummary {
       return a.text.localeCompare(b.text);
     });
 
-  // Recency first, then unambiguous identity keys. A truncated compound key
-  // collides when two matches share a timestamp *and* a long common prefix in
-  // their snippet, which reorders the list between runs.
+  // 每个短语至少给一张卡：按短语分组后轮询取样。全局按时间取前 N 条会让
+  // 低频短语（57 个里曾有 45 个）一张卡都分不到，点 chip 后空列表。
+  // 组内按时间倒序 + 无歧义身份键排序，保证两次运行结果一致。
   const allMatches = Object.values(stats.modelMatches).flat();
-  const hallOfShame = [...allMatches]
-    .sort((a, b) => {
-      if (b.timestamp !== a.timestamp) return b.timestamp - a.timestamp;
-      if (a.harness !== b.harness) return a.harness.localeCompare(b.harness);
-      if (a.sessionId !== b.sessionId) return a.sessionId.localeCompare(b.sessionId);
-      if (a.model !== b.model) return a.model.localeCompare(b.model);
-      if (a.phrase !== b.phrase) return a.phrase.localeCompare(b.phrase);
-      return a.snippet.localeCompare(b.snippet);
-    })
-    .slice(0, 35);
+  const byPhrase = new Map<string, DroolMatch[]>();
+  for (const m of allMatches) {
+    const list = byPhrase.get(m.phrase);
+    if (list) list.push(m);
+    else byPhrase.set(m.phrase, [m]);
+  }
+  const cmp = (a: DroolMatch, b: DroolMatch) => {
+    if (b.timestamp !== a.timestamp) return b.timestamp - a.timestamp;
+    if (a.harness !== b.harness) return a.harness.localeCompare(b.harness);
+    if (a.sessionId !== b.sessionId) return a.sessionId.localeCompare(b.sessionId);
+    if (a.model !== b.model) return a.model.localeCompare(b.model);
+    return a.snippet.localeCompare(b.snippet);
+  };
+  const quoteCap = Math.min(200, Math.max(60, phraseCloud.length));
+  const hallOfShame: DroolMatch[] = [];
+  const queues = phraseCloud
+    .map((p) => byPhrase.get(p.text))
+    .filter((q): q is DroolMatch[] => Boolean(q && q.length))
+    .map((q) => q.sort(cmp));
+  let cursor = 0;
+  while (hallOfShame.length < quoteCap) {
+    let tookAny = false;
+    for (const q of queues) {
+      if (cursor < q.length) {
+        hallOfShame.push(q[cursor]);
+        tookAny = true;
+        if (hallOfShame.length >= quoteCap) break;
+      }
+    }
+    if (!tookAny) break;
+    cursor += 1;
+  }
 
   const totalDroolCount = stats.matchCount;
   const totalAssistantMessages = stats.messageCount;
