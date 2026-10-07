@@ -687,6 +687,14 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
     .btn-text:hover { border-color: transparent; background: var(--accent-soft); }
     .btn[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
     .btn.loading { cursor: progress; opacity: 0.85; }
+    .btn-upload {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(79, 70, 229, 0.35);
+    }
+    .btn-upload:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+    .brand-actions { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: flex-end; }
     .btn .spinner {
       width: 14px;
       height: 14px;
@@ -818,7 +826,7 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
     /* ---------- Print ---------- */
     @media print {
       body { background: #fff; padding: 0; }
-      .table-toolbar, .result-line, .actions, .back-top, .toast { display: none !important; }
+      .table-toolbar, .result-line, .actions, .brand-actions, .back-top, .toast { display: none !important; }
       .quote-card, .harness-list, table { break-inside: avoid; }
     }
   </style>
@@ -828,7 +836,10 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
     <header class="masthead">
       <div class="brand-row">
         <div class="brand">SHALEME<span class="sub">傻了么</span></div>
-        <div class="meta num">${summary.generatedDate} · ${summary.totalSessionsScanned.toLocaleString()} 组会话 · ${summary.activeHarnessCount} 个平台</div>
+        <div class="brand-actions">
+          <div class="meta num">${summary.generatedDate} · ${summary.totalSessionsScanned.toLocaleString()} 组会话 · ${summary.activeHarnessCount} 个平台</div>
+          <button type="button" class="btn btn-upload" data-upload-btn onclick="submitToLeaderboard()">↑ 上传到榜单</button>
+        </div>
       </div>
       <div class="masthead-main">
         <h1>AI 模型<span class="hl">「你说得对」</span>行为基准分析报告</h1>
@@ -951,7 +962,7 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
       <button type="button" class="btn btn-primary" id="copyBtn" onclick="copySummaryText()">复制战报摘要</button>
       <button type="button" class="btn" onclick="exportPayload()">导出成绩 JSON</button>
       <button type="button" class="btn" onclick="window.print()">打印 / 导出 PDF</button>
-      <button type="button" class="btn" id="uploadBtn" onclick="submitToLeaderboard()">上传到榜单</button>
+      <button type="button" class="btn" data-upload-btn onclick="submitToLeaderboard()">上传到榜单</button>
       <p class="actions-hint">上传仅含汇总计数，不含对话内容。</p>
     </section>
 
@@ -1229,11 +1240,14 @@ export function generateReportHtml(summary: ReportSummary, leaderboardEndpoint?:
         toast('本报告未配置榜单地址，请先导出成绩 JSON');
         return;
       }
-      const btn = document.getElementById('uploadBtn');
-      btn.disabled = true;
-      btn.classList.add('loading');
-      btn.setAttribute('aria-busy', 'true');
-      btn.innerHTML = '<span class="spinner"></span>正在上传…';
+      // masthead 和 actions 各有一个上传按钮，状态要同步，否则一个转圈一个可点。
+      const btns = document.querySelectorAll('[data-upload-btn]');
+      btns.forEach(function (btn) {
+        btn.disabled = true;
+        btn.classList.add('loading');
+        btn.setAttribute('aria-busy', 'true');
+        btn.innerHTML = '<span class="spinner"></span>正在上传…';
+      });
       const payload = buildPayload();
       const form = document.createElement('form');
       form.method = 'POST';
