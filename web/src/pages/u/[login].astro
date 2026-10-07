@@ -34,7 +34,18 @@ function formatDate(value: number) {
     return '-';
   }
 
-  return new Date(value).toISOString().slice(0, 16).replace('T', ' ');
+  // 榜单面向国内用户，和 CLI 报告一致按东八区显示；toISOString 会差 8 小时。
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+    .format(new Date(value))
+    .replace(/\//g, '-');
 }
 ---
 
