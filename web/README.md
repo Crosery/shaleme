@@ -34,7 +34,7 @@ web/
 │   │   └── types.ts                # 与 CLI 对齐的载荷类型
 │   ├── components/                 # StatusBanner
 │   └── pages/
-│       ├── index.astro             # 榜单：人榜 + 模型榜双榜切换
+│       ├── index.astro             # 榜单：人榜 + 模型榜 + Harness 榜三榜切换
 │       ├── models.astro            # 单模型下钻
 │       ├── upload.astro            # 上传说明 + 提交结果落点
 │       ├── submit.ts               # 报告页「上传到榜单」的落点
@@ -121,7 +121,9 @@ PRIOR_MASS = 5000（伪计数）
 
 小样本被拉向全局均值、大样本几乎不动——信息越多置信度越高。同分再按
 `drool_count DESC, assistant_messages DESC, updated_at ASC` 断序。原始 MDI 仍然展示
-（tooltip），只是不再直接决定名次。
+（tooltip），只是不再直接决定名次。模型榜/Harness 榜只统计**每人最近一次**提交
+（`MODEL_PRIOR_CTE_SQL` 的 `latest` CTE），与 entries 的 upsert 口径对齐：
+否则重新上传一次，同一份语料会被计两遍。
 
 `migrations/0001_init.sql` 里的 `leaderboard_entries_rank_idx` 是旧口径（drool_count 优先）
 遗留的，score 是运行时表达式走不了索引；数据量大了再把 score 物化成列。
@@ -325,5 +327,5 @@ npm run dev                        # http://127.0.0.1:4321
 - D1 类型是本目录 `src/env.d.ts` 里手写的最小面（只覆盖用到的
   `prepare/bind/first/run/all/batch`），没有引入 `@cloudflare/workers-types`。
   要用到别的 API 时需要补声明。
-- 单模型榜会把同一模型的所有历史提交按人汇总统计「最烫的模型」，但随着提交次数增长，
-  这个查询扫的行数是提交次数而不是人数，数据量大之后需要改成读 entries 快照。
+- 「最烫的模型/Harness」按每人最近一次提交聚合，扫描行数是 人数×明细数；
+  数据量大之后可以考虑物化成快照表。

@@ -59,14 +59,29 @@ const PRIOR_CTE_SQL = `
 const ENTRY_RANK_ORDER_SQL =
   `${scoreExpr('')} DESC, drool_count DESC, assistant_messages DESC, updated_at ASC`;
 
+/**
+ * 模型/Harness 榜的口径和人榜对齐：只统计每人【最近一次】提交。
+ * entries 是 upsert 单行（最新一次），明细表却是全历史追加；不过滤的话
+ * 重新上传一次，同一份语料就被计两遍（实测模型榜 984 vs 人榜 494）。
+ * latest = 每人最新提交；prior 也只在最新提交的样本上算，先验才不掺旧数据。
+ */
 const MODEL_PRIOR_CTE_SQL = `
-  WITH prior AS (
+  WITH latest AS (
+    SELECT id FROM (
+      SELECT id, ROW_NUMBER() OVER (
+        PARTITION BY github_id ORDER BY created_at DESC, id DESC
+      ) AS rn
+      FROM leaderboard_submissions
+    ) WHERE rn = 1
+  ),
+  prior AS (
     SELECT
-      CASE WHEN SUM(assistant_messages) > 0
-        THEN SUM(drool_count) * 1.0 / SUM(assistant_messages)
+      CASE WHEN SUM(m.assistant_messages) > 0
+        THEN SUM(m.drool_count) * 1.0 / SUM(m.assistant_messages)
         ELSE 0
       END AS rate
-    FROM leaderboard_submission_models
+    FROM leaderboard_submission_models AS m
+    JOIN latest ON latest.id = m.submission_id
   )
 `;
 const MODEL_RANK_ORDER_SQL =
@@ -338,6 +353,7 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
               ORDER BY ${MODEL_RANK_ORDER_SQL}
             ) AS user_rank
           FROM leaderboard_submission_models AS m
+          JOIN latest ON latest.id = m.submission_id
           JOIN leaderboard_entries AS e ON e.github_id = m.github_id
           CROSS JOIN prior
         ),
@@ -391,7 +407,9 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
           (SUM(drool_count) + ${PRIOR_MASS} * prior.rate)
             / (SUM(assistant_messages) + ${PRIOR_MASS}) * 1000 AS score,
           COUNT(DISTINCT github_id) AS contributors
-        FROM leaderboard_submission_models CROSS JOIN prior
+        FROM leaderboard_submission_models AS m
+        JOIN latest ON latest.id = m.submission_id
+        CROSS JOIN prior
         GROUP BY model, prior.rate
         ORDER BY score DESC, droolCount DESC, model ASC
         LIMIT ?
@@ -415,7 +433,9 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
           (SUM(drool_count) + ${PRIOR_MASS} * prior.rate)
             / (SUM(assistant_messages) + ${PRIOR_MASS}) * 1000 AS score,
           COUNT(DISTINCT github_id) AS contributors
-        FROM leaderboard_submission_harnesses CROSS JOIN prior
+        FROM leaderboard_submission_harnesses AS h
+        JOIN latest ON latest.id = h.submission_id
+        CROSS JOIN prior
         GROUP BY harness, prior.rate
         ORDER BY score DESC, droolCount DESC, harness ASC
         LIMIT ?
