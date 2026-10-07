@@ -99,6 +99,17 @@ export interface ModelLeaderboardEntry {
 }
 
 /**
+ * Per-harness figures as submitted to a leaderboard. Same flat shape as
+ * ModelLeaderboardEntry: counts only, no conversation content.
+ */
+export interface HarnessLeaderboardEntry {
+  harness: string;
+  droolCount: number;
+  totalMessages: number;
+  mdi: number;
+}
+
+/**
  * What a report contributes to a leaderboard.
  *
  * Mirrors the shape maleme submits (a small set of scalar metrics plus a
@@ -117,6 +128,7 @@ export interface LeaderboardReportPayload {
   sessionsScanned: number;
   modelCount: number;
   modelEntries: ModelLeaderboardEntry[];
+  harnessEntries: HarnessLeaderboardEntry[];
   generatedAt: number;
 }
 

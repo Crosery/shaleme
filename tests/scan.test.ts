@@ -200,4 +200,34 @@ describe('buildLeaderboardPayload', () => {
     expect(payload.mdi).toBe(report.overallDroolIndex);
     expect(payload.mdi).toBe(40);
   });
+
+  it('carries per-harness counts for the harness leaderboard', () => {
+    const messages = [
+      msg({ sessionId: 's1', text: '你说得对，我改。' }),
+      msg({ sessionId: 's1', text: '好的。' }),
+      msg({ sessionId: 's2', harness: 'codex', text: '按你说的改。', model: 'gpt-6-astra' }),
+      msg({ sessionId: 's2', harness: 'codex', text: '收到。', model: 'gpt-6-astra' }),
+    ];
+    const harnessStats = createEmptyHarnessStats();
+    for (const m of messages) {
+      const h = harnessStats[m.harness];
+      h.messageCount += 1;
+      if (new SycophancyDetector().scanMessage(m).length > 0) h.droolCount += 1;
+    }
+    const report = buildReportSummary({
+      stats: run(messages),
+      harnessStats,
+      activeHarnessCount: 2,
+      version: '0.1.6',
+    });
+    const payload = buildLeaderboardPayload(report);
+    const rows = Object.fromEntries(payload.harnessEntries.map((h) => [h.harness, h]));
+    expect(rows['Claude Code'].totalMessages).toBe(2);
+    expect(rows['Claude Code'].droolCount).toBe(1);
+    expect(rows['Codex'].totalMessages).toBe(2);
+    expect(rows['Codex'].droolCount).toBe(1);
+    // 零消息的 harness 不进载荷；载荷里也不许出现对话正文。
+    expect(payload.harnessEntries.every((h) => h.totalMessages > 0)).toBe(true);
+    expect(JSON.stringify(payload.harnessEntries)).not.toContain('我改');
+  });
 });

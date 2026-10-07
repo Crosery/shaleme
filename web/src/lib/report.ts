@@ -5,7 +5,7 @@
  * 非有限数、负数、超长数组、缺字段都在这里被削掉，后面各层只处理干净数据。
  */
 
-import type { LeaderboardReportPayload, ModelEntry } from './types';
+import type { HarnessEntry, LeaderboardReportPayload, ModelEntry } from './types';
 
 /** modelEntries 的上限。CLI 的模型榜现在只有几十行，500 足够且能挡住灌水。 */
 export const MAX_MODEL_ENTRIES = 500;
@@ -93,6 +93,41 @@ function normalizeModelEntries(value: unknown) {
   });
 }
 
+/** harnessEntries 的上限。CLI 目前 11 个 harness，留足余量挡灌水。 */
+export const MAX_HARNESS_ENTRIES = 50;
+const MAX_HARNESS_NAME_LENGTH = 60;
+
+function normalizeHarnessEntries(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [] satisfies HarnessEntry[];
+  }
+
+  return value.slice(0, MAX_HARNESS_ENTRIES).flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const source = item as Record<string, unknown>;
+    const harness = asTrimmedString(source.harness, MAX_HARNESS_NAME_LENGTH);
+
+    if (!harness) {
+      return [];
+    }
+
+    const droolCount = asNonNegativeInteger(source.droolCount);
+    const totalMessages = asNonNegativeInteger(source.totalMessages);
+
+    return [
+      {
+        harness,
+        droolCount,
+        totalMessages,
+        mdi: roundMdi(resolveMdi(source.mdi, droolCount, totalMessages)),
+      },
+    ] satisfies HarnessEntry[];
+  });
+}
+
 /**
  * 只认「纯对象」。数组和 null 都是合法 JSON，但都不是报告：
  * 放过去就会写进一行全零的成绩，或者让调用方以为解析成功。
@@ -112,6 +147,7 @@ export function createEmptyReportPayload(): LeaderboardReportPayload {
     sessionsScanned: 0,
     modelCount: 0,
     modelEntries: [],
+    harnessEntries: [],
     generatedAt: 0,
   };
 }
@@ -121,6 +157,7 @@ export function normalizeReportPayload(value: unknown): LeaderboardReportPayload
   const droolCount = asNonNegativeInteger(source.droolCount);
   const assistantMessages = asNonNegativeInteger(source.assistantMessages);
   const modelEntries = normalizeModelEntries(source.modelEntries);
+  const harnessEntries = normalizeHarnessEntries(source.harnessEntries);
 
   // modelCount 以真实行数为准，避免报一个和数组长度不符的数字。
   return {
@@ -131,6 +168,7 @@ export function normalizeReportPayload(value: unknown): LeaderboardReportPayload
     sessionsScanned: asNonNegativeInteger(source.sessionsScanned),
     modelCount: modelEntries.length,
     modelEntries,
+    harnessEntries,
     generatedAt: asNonNegativeInteger(source.generatedAt),
   };
 }

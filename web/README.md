@@ -71,6 +71,9 @@ web/
   "modelEntries": [
     { "model": "gpt-5", "droolCount": 88, "totalMessages": 2100, "mdi": 41.9 }
   ],
+  "harnessEntries": [
+    { "harness": "Claude Code", "droolCount": 88, "totalMessages": 2100, "mdi": 41.9 }
+  ],
   "generatedAt": 1759100000000
 }
 ```
@@ -96,6 +99,8 @@ export SHALEME_LEADERBOARD_URL=https://shaleme.example.com/submit
 服务端会做的事：`assistantMessages` 为 0 时把 `mdi` 归零；否则用
 `droolCount / assistantMessages * 1000` 重算，只接受与计算结果相差 1% 以内的上报值。
 `modelEntries` 超过 500 条会被截断，`modelCount` 一律以实际行数为准。
+`harnessEntries`（0.1.6 起，Harness 榜用）超过 50 条同样截断，旧版本 CLI 不带这个
+字段时按空数组处理，不影响其余落榜。
 
 ### 隐私边界
 

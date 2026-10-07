@@ -21,6 +21,14 @@ export type ModelEntry = {
   mdi: number;
 };
 
+/** 提交载荷里的单 harness 行，对应 CLI 的 HarnessLeaderboardEntry。 */
+export type HarnessEntry = {
+  harness: string;
+  droolCount: number;
+  totalMessages: number;
+  mdi: number;
+};
+
 /**
  * 报告页「上传到榜单」POST 上来的 JSON，字段与 CLI 的
  * `LeaderboardReportPayload` 一一对应。
@@ -36,6 +44,7 @@ export type LeaderboardReportPayload = {
   sessionsScanned: number;
   modelCount: number;
   modelEntries: ModelEntry[];
+  harnessEntries: HarnessEntry[];
   generatedAt: number;
 };
 
@@ -107,4 +116,16 @@ export type ModelDashboard = {
   modelGroups: ModelLeaderboardGroup[];
   /** 把所有人在同一模型上的数据汇总后重算 MDI，衡量模型本身的倾向。 */
   hottestModels: HottestModel[];
+  /** 把所有人在同一 harness 上的数据汇总后重算 MDI，衡量平台的倾向。 */
+  hottestHarnesses: HottestHarness[];
+};
+
+/** Harness 榜：所有人汇总后的平台行，口径与 HottestModel 一致。 */
+export type HottestHarness = {
+  harness: string;
+  droolCount: number;
+  assistantMessages: number;
+  mdi: number;
+  score: number;
+  contributors: number;
 };

@@ -9,6 +9,7 @@
  */
 
 import {
+  HarnessLeaderboardEntry,
   LeaderboardReportPayload,
   ModelLeaderboardEntry,
   ReportSummary,
@@ -22,6 +23,15 @@ export function buildLeaderboardPayload(summary: ReportSummary): LeaderboardRepo
     mdi: m.droolIndex,
   }));
 
+  const harnessEntries: HarnessLeaderboardEntry[] = Object.values(summary.harnessStats)
+    .filter((h) => h.messageCount > 0)
+    .map((h) => ({
+      harness: h.name,
+      droolCount: h.droolCount,
+      totalMessages: h.messageCount,
+      mdi: h.droolIndex,
+    }));
+
   return {
     version: summary.version,
     droolCount: summary.totalDroolCount,
@@ -30,6 +40,7 @@ export function buildLeaderboardPayload(summary: ReportSummary): LeaderboardRepo
     sessionsScanned: summary.totalSessionsScanned,
     modelCount: summary.modelRankings.length,
     modelEntries,
+    harnessEntries,
     generatedAt: summary.generatedAt,
   };
 }

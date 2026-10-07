@@ -12,8 +12,11 @@ const databaseReady = hasDatabaseBinding();
 const state = Astro.url.searchParams.get('state') ?? '';
 
 const entries = databaseReady ? await listLeaderboard(50) : [];
-const dashboard = databaseReady ? await getModelDashboard(1, 12) : { hottestModels: [] };
+const dashboard = databaseReady
+  ? await getModelDashboard(1, 12)
+  : { hottestModels: [], hottestHarnesses: [] };
 const maxScore = dashboard.hottestModels.length > 0 ? dashboard.hottestModels[0].score : 1;
+const maxHarnessScore = dashboard.hottestHarnesses.length > 0 ? dashboard.hottestHarnesses[0].score : 1;
 
 function fmt(value: number) {
   return value.toLocaleString('en-US');
@@ -50,6 +53,9 @@ function fmt(value: number) {
           </button>
           <button type="button" class="seg-btn" aria-pressed="false" data-board="models">
             模型榜 <span class="count num">{dashboard.hottestModels.length}</span>
+          </button>
+          <button type="button" class="seg-btn" aria-pressed="false" data-board="harnesses">
+            Harness 榜 <span class="count num">{dashboard.hottestHarnesses.length}</span>
           </button>
         </div>
         <a class="btn-text btn howto" href="/upload">怎么上榜？</a>
@@ -167,6 +173,59 @@ function fmt(value: number) {
                           <td class="right">
                             <span class="score num" data-tip={`原始 MDI ${model.mdi.toFixed(2)} · ${model.contributors} 人提交`}>
                               {model.score.toFixed(1)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )
+            }
+          </section>
+
+          <section class="board" id="board-harnesses" hidden>
+            {
+              dashboard.hottestHarnesses.length === 0 ? (
+                <div class="empty-state">
+                  <p>还没有带 Harness 明细的提交。升级到 shaleme ≥ 0.1.6 并重新上传即可上榜。</p>
+                </div>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th class="col-rank"></th>
+                      <th>Agent 平台</th>
+                      <th class="right">命中</th>
+                      <th class="right">消息</th>
+                      <th class="right">分数</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.hottestHarnesses.map((harness, index) => {
+                      const tier = getMdiTier(harness.score);
+                      return (
+                        <tr>
+                          <td class="col-rank">
+                            <span class:list={['rank-num', 'num', index + 1 <= 3 && 'podium']}>
+                              {index + 1}
+                            </span>
+                          </td>
+                          <td>
+                            <span class="model-name">{harness.harness}</span>
+                            <span
+                              class="mdi-bar"
+                              aria-hidden="true"
+                              style={`--w:${Math.max(2, Math.round((harness.score / maxHarnessScore) * 100))}%`}
+                            >
+                              <span class="mdi-fill" style={`background:${tier.color};`}></span>
+                            </span>
+                          </td>
+                          <td class="right num">{fmt(harness.droolCount)}</td>
+                          <td class="right num muted">{fmt(harness.assistantMessages)}</td>
+                          <td class="right">
+                            <span class="score num" data-tip={`原始 MDI ${harness.mdi.toFixed(2)} · ${harness.contributors} 人提交`}>
+                              {harness.score.toFixed(1)}
                             </span>
                           </td>
                         </tr>

@@ -118,6 +118,8 @@ type HottestModelRow = {
   contributors: number;
 };
 
+type HottestHarnessRow = Omit<HottestModelRow, 'model'> & { harness: string };
+
 function getDatabase() {
   if (!env.DB) {
     throw new Error('D1 binding DB is missing.');
@@ -398,6 +400,30 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
     .bind(hottestModelsLimit)
     .all<HottestModelRow>();
 
+  const hottestHarnessesResult = await database
+    .prepare(
+      `
+        ${MODEL_PRIOR_CTE_SQL}
+        SELECT
+          harness,
+          COALESCE(SUM(drool_count), 0) AS droolCount,
+          COALESCE(SUM(assistant_messages), 0) AS assistantMessages,
+          CASE WHEN SUM(assistant_messages) > 0
+            THEN SUM(drool_count) * 1000.0 / SUM(assistant_messages)
+            ELSE 0
+          END AS mdi,
+          (SUM(drool_count) + ${PRIOR_MASS} * prior.rate)
+            / (SUM(assistant_messages) + ${PRIOR_MASS}) * 1000 AS score,
+          COUNT(DISTINCT github_id) AS contributors
+        FROM leaderboard_submission_harnesses CROSS JOIN prior
+        GROUP BY harness, prior.rate
+        ORDER BY score DESC, droolCount DESC, harness ASC
+        LIMIT ?
+      `,
+    )
+    .bind(hottestModelsLimit)
+    .all<HottestHarnessRow>();
+
   // rows 已经按 model ASC, rank ASC 返回，按顺序分组即可，不必再排序。
   const modelGroups: ModelLeaderboardGroup[] = [];
 
@@ -415,6 +441,14 @@ export async function getModelDashboard(rowsPerModel = 20, hottestModelsLimit = 
     modelGroups,
     hottestModels: hottestModelsResult.results.map((row) => ({
       model: row.model,
+      droolCount: Number(row.droolCount),
+      assistantMessages: Number(row.assistantMessages),
+      mdi: Number(row.mdi),
+      score: Number(row.score),
+      contributors: Number(row.contributors),
+    })),
+    hottestHarnesses: hottestHarnessesResult.results.map((row) => ({
+      harness: row.harness,
       droolCount: Number(row.droolCount),
       assistantMessages: Number(row.assistantMessages),
       mdi: Number(row.mdi),
@@ -611,9 +645,37 @@ export async function upsertLeaderboardEntry(
 
   const submissionId = Number(submissionResult.meta.last_row_id || 0);
 
-  if (!submissionId || submission.modelEntries.length === 0) {
+  if (!submissionId || (submission.modelEntries.length === 0 && submission.harnessEntries.length === 0)) {
     return;
   }
+
+  const harnessStatements = submission.harnessEntries.map((entry) =>
+    database
+      .prepare(
+        `
+          INSERT INTO leaderboard_submission_harnesses (
+            submission_id,
+            github_id,
+            harness,
+            drool_count,
+            assistant_messages,
+            mdi,
+            created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .bind(
+        submissionId,
+        viewer.githubId,
+        entry.harness,
+        entry.droolCount,
+        entry.totalMessages,
+        entry.mdi,
+        updatedAt,
+      ),
+  );
+
+  await database.batch(harnessStatements);
 
   const insertStatements = submission.modelEntries.map((entry) =>
     database
